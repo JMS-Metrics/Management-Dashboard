@@ -683,7 +683,10 @@ function computeFulfillment(rows){
 function computeData(raw, sourceName){
   const rows=[];
   for(const r of raw){
-    const d=r.order_date instanceof Date?r.order_date:new Date(r.order_date);
+    let d;
+    if(r.order_date instanceof Date){ d=r.order_date; }
+    else { const _m=String(r.order_date).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      d=_m ? new Date(+_m[1], +_m[2]-1, +_m[3]) : new Date(r.order_date); } // parse YYYY-MM-DD as LOCAL date (avoid UTC off-by-one)
     if(!d||isNaN(d))continue;
     const sub=+r.subtotal||0, cost=+r.total_drug_cost||0;
     rows.push({_d:d,_ym:ymKey(d),
