@@ -210,23 +210,6 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
   </section>
 
   <section>
-    <div class="shead"><h2>Week over week</h2><span class="hint" id="wow-hint"></span></div>
-    <div class="kpis" id="wow-kpis" style="margin-bottom:18px"></div>
-    <div class="card chart-wrap">
-      <svg class="chart" id="wtrend" viewBox="0 0 980 230" preserveAspectRatio="xMidYMid meet"></svg>
-      <div class="cap" id="wtrend-cap"></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="shead"><h2>Overall sales trend</h2><span class="hint">monthly revenue with 3-month moving average</span></div>
-    <div class="card chart-wrap">
-      <svg class="chart" id="trend" viewBox="0 0 980 360" preserveAspectRatio="xMidYMid meet"></svg>
-      <div class="cap" id="trend-cap"></div>
-    </div>
-  </section>
-
-  <section>
     <div class="shead"><h2>Order fulfillment &amp; pharmacies</h2><span class="hint" id="ful-hint"></span></div>
     <div class="kpis" id="ful-kpis" style="margin-bottom:18px"></div>
     <div class="grid2">
@@ -242,8 +225,25 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
   </section>
 
   <section>
-    <div class="shead"><h2>Rep momentum</h2><span class="hint">change across three horizons</span><span class="num-tag" id="rep-tag"></span></div>
+    <div class="shead"><h2>Rep Stats</h2><span class="hint" id="rep-hint"></span></div>
     <div class="card" style="padding:8px 10px"><table id="reptbl"></table></div>
+  </section>
+
+  <section>
+    <div class="shead"><h2>Week over week</h2><span class="hint" id="wow-hint"></span></div>
+    <div class="kpis" id="wow-kpis" style="margin-bottom:18px"></div>
+    <div class="card chart-wrap">
+      <svg class="chart" id="wtrend" viewBox="0 0 980 230" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="cap" id="wtrend-cap"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><h2>Overall sales trend</h2><span class="hint">monthly revenue with 3-month moving average</span></div>
+    <div class="card chart-wrap">
+      <svg class="chart" id="trend" viewBox="0 0 980 360" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="cap" id="trend-cap"></div>
+    </div>
   </section>
 
   <section>
@@ -470,22 +470,8 @@ renderPeriodToggle(); renderKpis();
      <span>Active clinics ${M.current}: <b>${s.active_clinics[s.active_clinics.length-1]}</b> (was ${s.active_clinics[s.active_clinics.length-2]})</span>`;
 })();
 
-/* rep momentum */
-document.getElementById("rep-tag").textContent=M.reps+" reps";
-(function(){
-  const head=`<thead><tr><th>Rep</th><th>${M.current} sales</th><th>MoM</th><th>Trailing 3-mo</th><th>YTD 2026</th><th>YTD share</th><th>Active clinics</th></tr></thead>`;
-  const rows=DATA.reps.map(r=>`<tr>
-    <td class="nm">${r.rep}</td>
-    <td class="num">${money0(r.may)}</td>
-    <td>${chip(r.mom)}</td>
-    <td class="num">${money(r.t3)} ${chip(r.t3pct)}</td>
-    <td class="num">${money0(r.ytd)}</td>
-    <td><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
-        <span class="num" style="color:var(--muted)">${r.share}%</span>
-        <span class="sharebar" style="width:90px"><i style="width:${Math.min(100,r.share)}%"></i></span></div></td>
-    <td class="num">${r.active}</td></tr>`).join("");
-  document.getElementById("reptbl").innerHTML=head+"<tbody>"+rows+"</tbody>";
-})();
+/* rep stats (period-scoped) */
+renderRepStats();
 
 /* movers */
 document.getElementById("mov-hint").textContent=M.prior+" → "+M.current;
@@ -630,7 +616,26 @@ function renderPeriodToggle(){
   if(!DATA.periods){ host.innerHTML=""; return; }
   const order=[["week","Week"],["month","Month"],["d90","90-Day"],["ytd","YTD"]].filter(o=>DATA.periods[o[0]]);
   host.innerHTML=order.map(o=>`<button class="btn pbtn" data-p="${o[0]}"${o[0]===SELP?' style="background:var(--accent);color:#0A1430;border-color:var(--accent);font-weight:700"':''}>${o[1]}</button>`).join("");
-  host.querySelectorAll(".pbtn").forEach(b=>b.addEventListener("click",()=>{ SELP=b.dataset.p; renderKpis(); renderPeriodToggle(); }));
+  host.querySelectorAll(".pbtn").forEach(b=>b.addEventListener("click",()=>{ SELP=b.dataset.p; renderKpis(); renderPeriodToggle(); renderFulfillment(); renderRepStats(); }));
+}
+function renderRepStats(){
+  const host=document.getElementById("reptbl"); if(!host) return;
+  const P=DATA.periods&&DATA.periods[SELP];
+  const reps=P?P.reps:((DATA.reps||[]).map(r=>({rep:r.rep,sales:r.may,prev:r.apr,pct:r.mom,active:r.active,share:r.share})));
+  const hint=document.getElementById("rep-hint");
+  if(hint) hint.textContent=P?(P.label+" · Total Sales "+P.sub):"Total Sales vs prior";
+  const head=`<thead><tr><th>Rep</th><th>Total Sales</th><th>Prior</th><th>Change</th><th>Active clinics</th><th>Share</th></tr></thead>`;
+  const body=reps.map(r=>`<tr>
+    <td class="nm">${r.rep}</td>
+    <td class="num">${money0(r.sales)}</td>
+    <td class="num" style="color:var(--muted)">${money0(r.prev)}</td>
+    <td>${(r.pct===null||r.pct===undefined)?'<span class="flat-mom">—</span>':chip(r.pct)}</td>
+    <td class="num">${r.active}</td>
+    <td><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+        <span class="num" style="color:var(--muted)">${r.share}%</span>
+        <span class="sharebar" style="width:90px"><i style="width:${Math.min(100,r.share)}%"></i></span></div></td>
+    </tr>`).join("");
+  host.innerHTML=head+"<tbody>"+body+"</tbody>";
 }
 
 /* ===== order fulfillment & pharmacy donuts ===== */
@@ -661,9 +666,10 @@ function donut(items,centerNoun,valFmt){
   return arcs+center+leg;
 }
 function renderFulfillment(){
-  const F=DATA.fulfillment; if(!F){return;}
+  const F=(DATA.periods&&DATA.periods[SELP]&&DATA.periods[SELP].fulfillment)||DATA.fulfillment; if(!F){return;}
   const hint=document.getElementById("ful-hint");
-  if(hint)hint.textContent="all-time · "+intf(F.orders_excl)+" fulfilled orders · "+F.n_pharm+" pharmacies · cancelled excluded from revenue";
+  const _plab=(DATA.periods&&DATA.periods[SELP])?DATA.periods[SELP].label:"all-time";
+  if(hint)hint.textContent=_plab+" · "+intf(F.orders_excl)+" fulfilled orders · "+F.n_pharm+" pharmacies · cancelled excluded from revenue";
   const cards=[
     {lab:"Fulfilled revenue",val:money(F.rev_excl),sub:"excludes "+money(F.rev_cancelled)+" cancelled"},
     {lab:"Cancellation rate",val:F.cancel_rate+"%",sub:intf(F.cancelled_orders)+" of "+intf(F.orders_all)+" orders"},
@@ -743,6 +749,7 @@ function computeData(raw, sourceName){
   if(!rows.length) throw new Error("no valid rows (check order_date column)");
   // Status/pharmacy mix is computed from ALL rows (incl. cancelled)…
   const fulfillment=computeFulfillment(rows);
+  const _rowsAll=rows.slice(); // keep cancelled rows for period-scoped fulfillment
   // …then cancelled orders are dropped so every downstream metric excludes them.
   for(let i=rows.length-1;i>=0;i--){ if(/cancel/i.test(rows[i]._status||"")) rows.splice(i,1); }
   if(!rows.length) throw new Error("every row is cancelled — nothing to report");
@@ -975,19 +982,34 @@ function computeData(raw, sourceName){
     const o=ord.size;
     return {sales:Math.round(sales),marg:Math.round(marg),orders:o,active:act.size,aov:o?Math.round(sales/o):0,newc:nc};
   };
-  const periods={
-    week:{label:"Week", sub:(_daysElapsed<7?("week-to-date ("+_daysElapsed+"d) vs same span last week"):"this week vs last week"),
-      cur:_agg(d=>{const t=_midT(d);return t>=_curWkS&&t<=_ceT;}),
-      prv:_agg(d=>{const t=_midT(d);return t>=_prevWkS&&(t-_prevWkS)<_daysElapsed*_DAY;})},
-    month:{label:"Month", sub:(monthPartial?("month-to-date vs "+sm(prior)+" 1–"+mDay):("vs "+ymLabel(prior))),
-      cur:_agg(d=>d.getFullYear()===_curY&&d.getMonth()===_curMo),
-      prv:_agg(d=>d.getFullYear()===_pmA.getFullYear()&&d.getMonth()===_pmA.getMonth()&&d.getDate()<=mDay)},
-    d90:{label:"90-Day", sub:"last 90 days vs prior 90 days",
-      cur:_agg(d=>{const t=_midT(d);return t>=_ceT-89*_DAY&&t<=_ceT;}),
-      prv:_agg(d=>{const t=_midT(d);return t>=_ceT-179*_DAY&&t<=_ceT-90*_DAY;})},
-    ytd:{label:"YTD", sub:"Jan 1–"+sm(cur)+" "+mDay+" · no prior-year data",
-      cur:_agg(d=>d.getFullYear()===_curY), prv:null},
+  const _ffFor=test=>computeFulfillment(_rowsAll.filter(r=>test(r._d)));
+  const _repsFor=(curT,prvT)=>{
+    const cs=new Map(),ps=new Map(),act=new Map(); let tot=0;
+    for(const r of rows){
+      if(curT(r._d)){ cs.set(r._rep,(cs.get(r._rep)||0)+r._sub); tot+=r._sub;
+        if(r._sub>0){ if(!act.has(r._rep))act.set(r._rep,new Set()); act.get(r._rep).add(r._clinic);} }
+      if(prvT&&prvT(r._d)){ ps.set(r._rep,(ps.get(r._rep)||0)+r._sub); }
+    }
+    return [...new Set([...cs.keys(),...ps.keys()])].map(rp=>{
+      const s=Math.round(cs.get(rp)||0), p=Math.round(ps.get(rp)||0);
+      return {rep:rp,sales:s,prev:p,pct:p?Math.round((s/p-1)*1000)/10:null,active:act.get(rp)?act.get(rp).size:0,share:tot?Math.round(s/tot*1000)/10:0};
+    }).sort((a,b)=>b.sales-a.sales);
   };
+  const _pdefs={
+    week:{label:"Week", sub:(_daysElapsed<7?("week-to-date ("+_daysElapsed+"d) vs same span last week"):"this week vs last week"),
+      cur:d=>{const t=_midT(d);return t>=_curWkS&&t<=_ceT;}, prv:d=>{const t=_midT(d);return t>=_prevWkS&&(t-_prevWkS)<_daysElapsed*_DAY;}},
+    month:{label:"Month", sub:(monthPartial?("month-to-date vs "+sm(prior)+" 1–"+mDay):("vs "+ymLabel(prior))),
+      cur:d=>d.getFullYear()===_curY&&d.getMonth()===_curMo, prv:d=>d.getFullYear()===_pmA.getFullYear()&&d.getMonth()===_pmA.getMonth()&&d.getDate()<=mDay},
+    d90:{label:"90-Day", sub:"last 90 days vs prior 90 days",
+      cur:d=>{const t=_midT(d);return t>=_ceT-89*_DAY&&t<=_ceT;}, prv:d=>{const t=_midT(d);return t>=_ceT-179*_DAY&&t<=_ceT-90*_DAY;}},
+    ytd:{label:"YTD", sub:"Jan 1–"+sm(cur)+" "+mDay+" · no prior-year data",
+      cur:d=>d.getFullYear()===_curY, prv:null},
+  };
+  const periods={};
+  for(const _k in _pdefs){ const _pd=_pdefs[_k];
+    periods[_k]={label:_pd.label, sub:_pd.sub, cur:_agg(_pd.cur), prv:_pd.prv?_agg(_pd.prv):null,
+      fulfillment:_ffFor(_pd.cur), reps:_repsFor(_pd.cur,_pd.prv)};
+  }
 
   return {
     meta:{generated,current:ymLabel(cur),prior:ymLabel(prior),months:months.map(ymLabel),
