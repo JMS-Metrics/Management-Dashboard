@@ -621,15 +621,20 @@ function renderPeriodToggle(){
 function renderRepStats(){
   const host=document.getElementById("reptbl"); if(!host) return;
   const P=DATA.periods&&DATA.periods[SELP];
-  const reps=P?P.reps:((DATA.reps||[]).map(r=>({rep:r.rep,sales:r.may,prev:r.apr,pct:r.mom,active:r.active,share:r.share})));
+  const reps=P?P.reps:((DATA.reps||[]).map(r=>({rep:r.rep,sales:r.may,prev:r.apr,pct:r.mom,active:r.active,share:r.share,newc:(r.newc||0),newcDelta:null})));
+  const hasPrior=!!(P&&P.prv);
   const hint=document.getElementById("rep-hint");
   if(hint) hint.textContent=P?(P.label+" · Total Sales "+P.sub):"Total Sales vs prior";
-  const head=`<thead><tr><th>Rep</th><th>Total Sales</th><th>Prior</th><th>Change</th><th>Active clinics</th><th>Share</th></tr></thead>`;
+  const ncd=r=>{ if(!hasPrior||r.newcDelta===null||r.newcDelta===undefined) return '';
+    const d=r.newcDelta, c=d>0?'var(--up)':(d<0?'var(--down)':'var(--muted)');
+    return `<span style="color:${c};font-size:11px;margin-left:6px">${d>0?'+'+d:(d<0?String(d):'±0')}</span>`; };
+  const head=`<thead><tr><th>Rep</th><th>Total Sales</th><th>Prior</th><th>Change</th><th># New Clinics</th><th>Active clinics</th><th>Share</th></tr></thead>`;
   const body=reps.map(r=>`<tr>
     <td class="nm">${r.rep}</td>
     <td class="num">${money0(r.sales)}</td>
     <td class="num" style="color:var(--muted)">${money0(r.prev)}</td>
     <td>${(r.pct===null||r.pct===undefined)?'<span class="flat-mom">—</span>':chip(r.pct)}</td>
+    <td class="num">${r.newc||0}${ncd(r)}</td>
     <td class="num">${r.active}</td>
     <td><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
         <span class="num" style="color:var(--muted)">${r.share}%</span>
@@ -990,9 +995,14 @@ function computeData(raw, sourceName){
         if(r._sub>0){ if(!act.has(r._rep))act.set(r._rep,new Set()); act.get(r._rep).add(r._clinic);} }
       if(prvT&&prvT(r._d)){ ps.set(r._rep,(ps.get(r._rep)||0)+r._sub); }
     }
-    return [...new Set([...cs.keys(),...ps.keys()])].map(rp=>{
+    const nc=new Map(),ncp=new Map();
+    for(const [cl,fd] of firstD){ const rp=firstDRep.get(cl)||"(unknown)";
+      if(curT(fd)) nc.set(rp,(nc.get(rp)||0)+1);
+      if(prvT&&prvT(fd)) ncp.set(rp,(ncp.get(rp)||0)+1); }
+    return [...new Set([...cs.keys(),...ps.keys(),...nc.keys()])].map(rp=>{
       const s=Math.round(cs.get(rp)||0), p=Math.round(ps.get(rp)||0);
-      return {rep:rp,sales:s,prev:p,pct:p?Math.round((s/p-1)*1000)/10:null,active:act.get(rp)?act.get(rp).size:0,share:tot?Math.round(s/tot*1000)/10:0};
+      const newc=nc.get(rp)||0, newcPrev=ncp.get(rp)||0;
+      return {rep:rp,sales:s,prev:p,pct:p?Math.round((s/p-1)*1000)/10:null,active:act.get(rp)?act.get(rp).size:0,share:tot?Math.round(s/tot*1000)/10:0,newc,newcPrev,newcDelta:newc-newcPrev};
     }).sort((a,b)=>b.sales-a.sales);
   };
   const _pdefs={
