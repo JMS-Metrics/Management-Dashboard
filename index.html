@@ -205,7 +205,10 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
 
   <section>
     <div class="shead"><h2>Headline metrics</h2><span class="hint" id="kpi-hint"></span></div>
-    <div id="period-toggle" style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px"></div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 14px">
+      <div id="period-toggle" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      <select id="rep-filter" style="margin-left:auto;background:var(--surface);color:var(--ink);border:1px solid var(--line2);border-radius:8px;padding:7px 10px;font:inherit;font-size:12.5px;cursor:pointer"></select>
+    </div>
     <div class="kpis" id="kpis"></div>
   </section>
 
@@ -381,7 +384,7 @@ document.getElementById("foot-tot").textContent="All-time revenue "+money0(M.tot
 })();
 
 /* KPIs */
-renderPeriodToggle(); renderKpis();
+renderPeriodToggle(); renderKpis(); renderRepFilter();
 
 /* week over week */
 (function(){
@@ -576,6 +579,29 @@ renderFulfillment();
 
 /* ===== headline period toggle (Week / Month / 90-Day / YTD) ===== */
 let SELP="month";
+let RAWROWS=null, ALLREPS=[], REP="";
+function _stripRep(s){ return String(s||"").replace(/^JMS\s*-\s*/,"").trim(); }
+function applyData(rawRows,name){
+  RAWROWS=rawRows;
+  ALLREPS=[...new Set(rawRows.map(r=>_stripRep(r.sales_rep)).filter(Boolean))].sort();
+  if(REP && !ALLREPS.includes(REP)) REP="";
+  const src = REP ? rawRows.filter(r=>_stripRep(r.sales_rep)===REP) : rawRows;
+  DATA=computeData(src,name);
+  renderAll();
+}
+function renderRepFilter(){
+  const sel=document.getElementById("rep-filter"); if(!sel) return;
+  const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  sel.innerHTML='<option value="">All reps</option>'+ALLREPS.map(r=>`<option value="${esc(r)}"${r===REP?' selected':''}>${esc(r)}</option>`).join("");
+  sel.onchange=()=>{
+    REP=sel.value;
+    if(!RAWROWS) return;
+    const src=REP?RAWROWS.filter(r=>_stripRep(r.sales_rep)===REP):RAWROWS;
+    try{ DATA=computeData(src,"Supabase"); }
+    catch(e){ console.error(e); REP=""; DATA=computeData(RAWROWS,"Supabase"); }
+    renderAll();
+  };
+}
 function periodCards(P){
   const c=P.cur, p=P.prv;
   const card=(label,key,fmt,sub)=>({label,value:c[key],fmt,pct:(p&&p[key])?Math.round((c[key]/p[key]-1)*1000)/10:null,sub:sub||P.sub});
@@ -759,8 +785,9 @@ function computeData(raw, sourceName){
   for(let i=rows.length-1;i>=0;i--){ if(/cancel/i.test(rows[i]._status||"")) rows.splice(i,1); }
   if(!rows.length) throw new Error("every row is cancelled — nothing to report");
   const months=[...new Set(rows.map(r=>r._ym))].sort();
-  if(months.length<2) throw new Error("need at least two months of data");
-  const cur=months[months.length-1], prior=months[months.length-2];
+  const cur=months[months.length-1];
+  let prior=months[months.length-2];
+  if(!prior){ const _pp=cur.split("-").map(Number); const _pd=new Date(_pp[0],_pp[1]-2,1); prior=_pd.getFullYear()+"-"+String(_pd.getMonth()+1).padStart(2,"0"); }
   const curYear=+cur.split("-")[0];
 
   const sumBy=(kf,vf,flt)=>{const m=new Map();for(const r of rows){if(flt&&!flt(r))continue;const k=kf(r);m.set(k,(m.get(k)||0)+vf(r));}return m;};
@@ -1049,8 +1076,7 @@ document.getElementById("imp-file").addEventListener("change",async e=>{
     if(!rows.length)throw new Error("the sheet is empty");
     if(!("subtotal"in rows[0])||!("order_date"in rows[0]))
       throw new Error("missing order_date / subtotal columns — is this a Metabase export?");
-    DATA=computeData(rows,f.name);
-    renderAll();
+    applyData(rows,f.name);
     setStatus("Loaded "+f.name+" · "+rows.length.toLocaleString()+" rows",true);
     window.scrollTo({top:0,behavior:"smooth"});
   }catch(err){console.error(err);setStatus("Couldn't read file: "+err.message,false);}
@@ -1114,7 +1140,7 @@ async function _loadFromSupabase(){
     const cached=await _cacheGet(key);
     if(cached && cached.rows && cached.rows.length){
       cachedSig=cached.sig||sigOf(cached.rows);
-      try{ DATA=computeData(cached.rows,"Supabase"); renderAll(); shownFromCache=true; stat("refreshing…"); }catch(e){}
+      try{ applyData(cached.rows,"Supabase"); shownFromCache=true; stat("refreshing…"); }catch(e){}
     }
   }catch(e){}
 
@@ -1122,7 +1148,7 @@ async function _loadFromSupabase(){
   try{
     const rows=await _fetchAllOrders();
     const freshSig=sigOf(rows);
-    if(!shownFromCache || freshSig!==cachedSig){ DATA=computeData(rows,"Supabase"); renderAll(); }
+    if(!shownFromCache || freshSig!==cachedSig){ applyData(rows,"Supabase"); } else { RAWROWS=rows; }
     stat("Live data · "+rows.length.toLocaleString()+" rows","ok");
     _cacheSet(key,{rows:rows, ts:Date.now(), sig:freshSig});
   }catch(err){
