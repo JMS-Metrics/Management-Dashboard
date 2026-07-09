@@ -164,6 +164,18 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
 @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}.tiers{grid-template-columns:repeat(2,1fr)}
   .grid2,.conc{grid-template-columns:1fr}}
 @media(max-width:560px){.kpis{grid-template-columns:1fr}.tiers{grid-template-columns:1fr}}
+#print-head{display:none}
+@media print{
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+  #login-gate{display:none !important}
+  #period-toggle,#rep-filter,#imp-status,#imp-file{display:none !important}
+  header.top .btn{display:none !important}
+  #lg-out{display:none !important}
+  #print-head{display:block !important;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid var(--line2)}
+  .wrap{max-width:none !important}
+  section,.card,.panel,.kpi,.chart-wrap{break-inside:avoid}
+  @page{margin:12mm}
+}
 </style>
 </head>
 <body>
@@ -196,10 +208,13 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
       <div style="margin-top:11px;display:flex;gap:11px;justify-content:flex-end;align-items:center">
         <span id="imp-status" class="imp-status"></span>
         <button id="imp-btn" class="btn">⭱&nbsp; Import data file</button>
+        <button id="exp-btn" class="btn">Export PDF</button>
         <input id="imp-file" type="file" accept=".xlsx,.xls,.csv" hidden>
       </div>
     </div>
   </header>
+
+  <div id="print-head"></div>
 
   <div class="alert" id="alert"></div>
 
@@ -252,12 +267,20 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
   <section>
     <div class="shead"><h2>Movers — increases &amp; decreases</h2><span class="hint" id="mov-hint"></span></div>
     <div class="grid2" style="margin-bottom:18px">
-      <div class="panel up-tint"><h4><span class="dot" style="background:var(--up)"></span>Drugs gaining</h4><table id="drug-up"></table></div>
-      <div class="panel down-tint"><h4><span class="dot" style="background:var(--down)"></span>Drugs declining</h4><table id="drug-down"></table></div>
+      <div class="panel up-tint"><h4><span class="dot" style="background:var(--up)"></span>Top 5 clinics gaining</h4><table id="clin-up"></table></div>
+      <div class="panel down-tint"><h4><span class="dot" style="background:var(--down)"></span>Top 5 clinics declining</h4><table id="clin-down"></table></div>
     </div>
     <div class="grid2">
-      <div class="panel up-tint"><h4><span class="dot" style="background:var(--up)"></span>Clinics gaining</h4><table id="clin-up"></table></div>
-      <div class="panel down-tint"><h4><span class="dot" style="background:var(--down)"></span>Clinics declining</h4><table id="clin-down"></table></div>
+      <div class="panel up-tint"><h4><span class="dot" style="background:var(--up)"></span>Top 5 drugs gaining</h4><table id="drug-up"></table></div>
+      <div class="panel down-tint"><h4><span class="dot" style="background:var(--down)"></span>Top 5 drugs declining</h4><table id="drug-down"></table></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><h2>New &amp; reactivated business</h2><span class="hint" id="nb-hint"></span></div>
+    <div class="grid2">
+      <div class="panel up-tint"><h4><span class="dot" style="background:var(--up)"></span>First-time clinics this month</h4><table id="new-tbl"></table></div>
+      <div class="panel"><h4><span class="dot" style="background:var(--accent2)"></span>Reactivated (returned after a gap)</h4><table id="react-tbl"></table></div>
     </div>
   </section>
 
@@ -272,33 +295,6 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
         <div class="defs" style="margin:-4px 0 10px">Down 50%+ month-over-month, with material prior-month sales.</div>
         <table id="sharp-tbl"></table></div>
     </div>
-  </section>
-
-  <section>
-    <div class="shead"><h2>Business health &amp; concentration</h2><span class="hint">where the revenue actually comes from</span></div>
-    <div class="card">
-      <div class="conc">
-        <div>
-          <div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em">Total Sales share by rep (all-time)</div>
-          <div class="cbars" id="conc-bars"></div>
-        </div>
-        <div class="ctiles" id="conc-tiles"></div>
-      </div>
-      <div class="risknote" id="risknote"></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="shead"><h2>New &amp; reactivated business</h2><span class="hint" id="nb-hint"></span></div>
-    <div class="grid2">
-      <div class="panel up-tint"><h4><span class="dot" style="background:var(--up)"></span>First-time clinics this month</h4><table id="new-tbl"></table></div>
-      <div class="panel"><h4><span class="dot" style="background:var(--accent2)"></span>Reactivated (returned after a gap)</h4><table id="react-tbl"></table></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="shead"><h2>Rep dashboards</h2><span class="hint" id="rd-hint"></span></div>
-    <div id="repdash"></div>
   </section>
 
   <footer>
@@ -524,6 +520,7 @@ document.getElementById("clin-down").innerHTML=moverTbl(DATA.movers.clinics.down
 
 /* concentration */
 (function(){
+  if(!document.getElementById("conc-bars")) return; // section removed
   const c=DATA.concentration;
   const mx=c.rep_shares[0].share;
   document.getElementById("conc-bars").innerHTML=c.rep_shares.map(r=>`
@@ -549,6 +546,7 @@ document.getElementById("clin-down").innerHTML=moverTbl(DATA.movers.clinics.down
 })();
 /* rep dashboards */
 (function(){
+  if(!document.getElementById("repdash")) return; // section removed
   document.getElementById("rd-hint").textContent="top 5 clinics gaining & declining per rep · "+M.prior+" → "+M.current;
   const mini=(rows,decline)=>{
     if(!rows||!rows.length) return '<div class="defs" style="padding:9px 2px">No clinics in this category for '+M.current+'.</div>';
@@ -1056,7 +1054,7 @@ function computeData(raw, sourceName){
     series:{months:months.map(ymLabel),revenue:revvals.map(Math.round),
       orders:months.map(m=>g(mord,m)),margin:months.map(m=>Math.round(g(mmarg,m))),
       active_clinics:months.map(m=>g(mac,m)),ma3,sources,revenue_src:msrc},
-    kpis,reps,movers:{drugs:movers(dm,8),clinics:movers(cm,10)},
+    kpis,reps,movers:{drugs:movers(dm,5),clinics:movers(cm,5)},
     atrisk,concentration,newbiz,rep_movers,weekly,fulfillment,periods,
   };
 }
@@ -1065,6 +1063,14 @@ function computeData(raw, sourceName){
 function setStatus(msg,ok){const s=document.getElementById("imp-status");
   s.textContent=msg;s.className="imp-status"+(ok===true?" ok":ok===false?" err":"");}
 document.getElementById("imp-btn").addEventListener("click",()=>document.getElementById("imp-file").click());
+function exportPDF(){
+  const ph=document.getElementById("print-head");
+  if(ph){ const rep=REP||"All Reps", per=(DATA.periods&&DATA.periods[SELP])?DATA.periods[SELP].label:"";
+    ph.innerHTML='<div style="font-family:Bricolage Grotesque,sans-serif;font-weight:700;font-size:20px;color:var(--ink)">JMS Management Dashboard</div>'
+      +'<div style="color:var(--muted);font-size:13px;margin-top:3px">'+rep+(per?" · "+per:"")+' · exported '+new Date().toLocaleDateString()+'</div>'; }
+  setTimeout(function(){ window.print(); },60);
+}
+(function(){ const b=document.getElementById("exp-btn"); if(b) b.addEventListener("click",exportPDF); })();
 document.getElementById("imp-file").addEventListener("change",async e=>{
   const f=e.target.files[0];if(!f)return;
   if(typeof XLSX==="undefined"){setStatus("Parser didn't load — needs an internet connection.",false);e.target.value="";return;}
