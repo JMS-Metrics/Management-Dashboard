@@ -222,7 +222,10 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
     <div class="shead"><h2>Headline metrics</h2><span class="hint" id="kpi-hint"></span></div>
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 14px">
       <div id="period-toggle" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-      <select id="rep-filter" style="margin-left:auto;background:var(--surface);color:var(--ink);border:1px solid var(--line2);border-radius:8px;padding:7px 10px;font:inherit;font-size:12.5px;cursor:pointer"></select>
+      <div id="rep-filter" style="margin-left:auto;position:relative">
+        <button id="rep-btn" type="button" class="btn" style="padding:7px 12px;font-size:12.5px">All reps ▾</button>
+        <div id="rep-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:40;background:var(--surface);border:1px solid var(--line2);border-radius:10px;padding:8px;min-width:250px;max-height:320px;overflow:auto;box-shadow:0 10px 30px rgba(0,0,0,.45)"></div>
+      </div>
     </div>
     <div class="kpis" id="kpis"></div>
   </section>
@@ -577,28 +580,51 @@ renderFulfillment();
 
 /* ===== headline period toggle (Week / Month / 90-Day / YTD) ===== */
 let SELP="month";
-let RAWROWS=null, ALLREPS=[], REP="";
+let RAWROWS=null, ALLREPS=[], REPS=[], REPMENU=false;
+function repLabel(){ if(!REPS.length) return "All reps"; if(REPS.length===1) return REPS[0]; return REPS.length+" reps selected"; }
+document.addEventListener("click",function(e){
+  const w=document.getElementById("rep-filter");
+  if(REPMENU && w && !w.contains(e.target)){ REPMENU=false; const m=document.getElementById("rep-menu"); if(m) m.style.display="none"; }
+});
 function _stripRep(s){ return String(s||"").replace(/^JMS\s*-\s*/,"").trim(); }
 function applyData(rawRows,name){
   RAWROWS=rawRows;
   ALLREPS=[...new Set(rawRows.map(r=>_stripRep(r.sales_rep)).filter(Boolean))].sort();
-  if(REP && !ALLREPS.includes(REP)) REP="";
-  const src = REP ? rawRows.filter(r=>_stripRep(r.sales_rep)===REP) : rawRows;
+  REPS=REPS.filter(r=>ALLREPS.includes(r));
+  const src = REPS.length ? rawRows.filter(r=>REPS.includes(_stripRep(r.sales_rep))) : rawRows;
   DATA=computeData(src,name);
   renderAll();
 }
+function recomputeForReps(){
+  if(!RAWROWS) return;
+  const src = REPS.length ? RAWROWS.filter(r=>REPS.includes(_stripRep(r.sales_rep))) : RAWROWS;
+  try{ DATA=computeData(src,"Supabase"); }
+  catch(e){ console.error(e); REPS=[]; DATA=computeData(RAWROWS,"Supabase"); }
+  renderAll();
+}
 function renderRepFilter(){
-  const sel=document.getElementById("rep-filter"); if(!sel) return;
+  const btn=document.getElementById("rep-btn"), menu=document.getElementById("rep-menu");
+  if(!btn||!menu) return;
   const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-  sel.innerHTML='<option value="">All reps</option>'+ALLREPS.map(r=>`<option value="${esc(r)}"${r===REP?' selected':''}>${esc(r)}</option>`).join("");
-  sel.onchange=()=>{
-    REP=sel.value;
-    if(!RAWROWS) return;
-    const src=REP?RAWROWS.filter(r=>_stripRep(r.sales_rep)===REP):RAWROWS;
-    try{ DATA=computeData(src,"Supabase"); }
-    catch(e){ console.error(e); REP=""; DATA=computeData(RAWROWS,"Supabase"); }
-    renderAll();
-  };
+  btn.textContent=repLabel()+" ▾";
+  const row=(val,label,checked)=>'<label style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12.5px;color:var(--ink)">'
+    +'<input type="checkbox" data-rep="'+esc(val)+'"'+(checked?" checked":"")+' style="accent-color:var(--accent)"><span>'+esc(label)+'</span></label>';
+  menu.innerHTML=row("__all","All reps",REPS.length===0)
+    +'<div style="height:1px;background:var(--line);margin:6px 2px"></div>'
+    +ALLREPS.map(r=>row(r,r,REPS.includes(r))).join("");
+  menu.style.display=REPMENU?"block":"none";
+  btn.onclick=function(e){ e.stopPropagation(); REPMENU=!REPMENU; menu.style.display=REPMENU?"block":"none"; };
+  menu.onclick=function(e){ e.stopPropagation(); };
+  menu.querySelectorAll('input[type=checkbox]').forEach(function(cb){
+    cb.addEventListener("change",function(){
+      const v=cb.getAttribute("data-rep");
+      if(v==="__all"){ REPS=[]; }
+      else if(cb.checked){ if(REPS.indexOf(v)<0) REPS.push(v); }
+      else { REPS=REPS.filter(function(x){ return x!==v; }); }
+      REPMENU=true;
+      recomputeForReps();
+    });
+  });
 }
 function periodCards(P){
   const c=P.cur, p=P.prv;
@@ -1065,7 +1091,7 @@ function setStatus(msg,ok){const s=document.getElementById("imp-status");
 document.getElementById("imp-btn").addEventListener("click",()=>document.getElementById("imp-file").click());
 function exportPDF(){
   const ph=document.getElementById("print-head");
-  if(ph){ const rep=REP||"All Reps", per=(DATA.periods&&DATA.periods[SELP])?DATA.periods[SELP].label:"";
+  if(ph){ const rep=(REPS.length?REPS.join(", "):"All Reps"), per=(DATA.periods&&DATA.periods[SELP])?DATA.periods[SELP].label:"";
     ph.innerHTML='<div style="font-family:Bricolage Grotesque,sans-serif;font-weight:700;font-size:20px;color:var(--ink)">JMS Management Dashboard</div>'
       +'<div style="color:var(--muted);font-size:13px;margin-top:3px">'+rep+(per?" · "+per:"")+' · exported '+new Date().toLocaleDateString()+'</div>'; }
   setTimeout(function(){ window.print(); },60);
