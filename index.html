@@ -664,7 +664,7 @@ function renderKpis(){
 function renderPeriodToggle(){
   const host=document.getElementById("period-toggle"); if(!host) return;
   if(!DATA.periods){ host.innerHTML=""; return; }
-  const order=[["week","Week"],["month","Month"],["d90","90-Day"],["ytd","YTD"]].filter(o=>DATA.periods[o[0]]);
+  const order=[["d1","1 Day"],["week","Week"],["month","Month"],["d90","90-Day"],["ytd","YTD"]].filter(o=>DATA.periods[o[0]]);
   host.innerHTML=order.map(o=>`<button class="btn pbtn" data-p="${o[0]}"${o[0]===SELP?' style="background:var(--accent);color:#0A1430;border-color:var(--accent);font-weight:700"':''}>${o[1]}</button>`).join("");
   host.querySelectorAll(".pbtn").forEach(b=>b.addEventListener("click",()=>{ SELP=b.dataset.p; renderKpis(); renderPeriodToggle(); renderFulfillment(); renderRepStats(); }));
 }
@@ -1056,7 +1056,11 @@ function computeData(raw, sourceName){
       return {rep:rp,sales:s,prev:p,pct:p?Math.round((s/p-1)*1000)/10:null,active:act.get(rp)?act.get(rp).size:0,share:tot?Math.round(s/tot*1000)/10:0,newc,newcPrev,newcDelta:newc-newcPrev};
     }).sort((a,b)=>b.sales-a.sales);
   };
+  const _pdD=new Date(maxDate.getFullYear(),maxDate.getMonth(),maxDate.getDate()-1), _pdT=_pdD.getTime();
+  const _dlab=d=>MONTHS[d.getMonth()]+" "+d.getDate();
   const _pdefs={
+    d1:{label:"1 Day", sub:_dlab(maxDate)+" vs "+_dlab(_pdD),
+      cur:d=>_midT(d)===_ceT, prv:d=>_midT(d)===_pdT},
     week:{label:"Week", sub:(_daysElapsed<7?("week-to-date ("+_daysElapsed+"d) vs same span last week"):"this week vs last week"),
       cur:d=>{const t=_midT(d);return t>=_curWkS&&t<=_ceT;}, prv:d=>{const t=_midT(d);return t>=_prevWkS&&(t-_prevWkS)<_daysElapsed*_DAY;}},
     month:{label:"Month", sub:(monthPartial?("month-to-date vs "+sm(prior)+" 1–"+mDay):("vs "+ymLabel(prior))),
