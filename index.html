@@ -987,6 +987,7 @@ function computeData(raw, sourceName){
   const weekStart=d=>{const wd=(d.getDay()+6)%7;return new Date(d.getFullYear(),d.getMonth(),d.getDate()-wd);};
   const dateKey=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
   const wkLabel=k=>{const[y,mm,dd]=k.split("-").map(Number);return MONTHS[mm-1]+" "+dd;};
+  const wkEnd=k=>{const[y,mm,dd]=k.split("-").map(Number);const s=new Date(y,mm-1,dd+6);return MONTHS[s.getMonth()]+" "+s.getDate();}; // Sunday that ends the (Mon–Sun) week
   const wkRev=sumBy(r=>dateKey(weekStart(r._d)),r=>r._sub);
   const wkOrd=cntSet(r=>dateKey(weekStart(r._d)),r=>r._oid);
   const wkKeys=[...wkRev.keys()].sort();
@@ -1016,10 +1017,10 @@ function computeData(raw, sourceName){
       wcard("Active clinics",cwActive,pwActive,"int"),
       wcard("Avg order value",Math.round(cwAov),Math.round(pwAov),"money"),
     ],
-    series:{weeks:lastW.map(wkLabel),revenue:lastW.map(k=>Math.round(wkRev.get(k))),
+    series:{weeks:lastW.map(wkEnd),revenue:lastW.map(k=>Math.round(wkRev.get(k))),
       orders:lastW.map(k=>wkOrd.get(k)||0),days_elapsed:daysElapsed,week_partial:weekPartial,
       sources,revenue_src:wsrc},
-    cur_label:`${wkLabel(curWkKey)}–${mDay}`, prev_label:wkLabel(prevWkKey),
+    cur_label:wkEnd(curWkKey), prev_label:wkEnd(prevWkKey),
     days_elapsed:daysElapsed, week_partial:weekPartial,
   };
 
