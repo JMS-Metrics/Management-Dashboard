@@ -1144,22 +1144,34 @@ async function _cacheSet(k,v){ try{ const db=await _idbOpen(); await new Promise
 async function _cacheClear(){ try{ const db=await _idbOpen(); await new Promise((res)=>{ const tx=db.transaction("kv","readwrite"); tx.objectStore("kv").clear(); tx.oncomplete=()=>res(); tx.onerror=()=>res(); }); }catch(e){} }
 
 async function _fetchAllOrders(){
-  // One request gets page 0 + the total count; the rest are pulled in parallel.
+  // Page 0 also returns the total count. Remaining pages are fetched a few at a
+  // time (bounded concurrency) with retries, so a burst can't overwhelm a small
+  // Supabase instance and a transient failure doesn't kill the whole refresh.
   const cols="order_date,sales_rep,clinic_name,drug_name,subtotal,total_drug_cost,pharmacy_id,status,order_id";
-  const size=1000;
-  const head=await sb.from("orders").select(cols,{count:"exact"}).range(0,size-1);
-  if(head.error) throw head.error;
-  const total=head.count; const all=head.data.slice();
-  if(total!=null && total>size){
-    const reqs=[];
-    for(let frm=size; frm<total; frm+=size){
-      reqs.push(sb.from("orders").select(cols).range(frm,frm+size-1).then(r=>{ if(r.error) throw r.error; return r.data; }));
+  const size=1000, CONC=4, RETRIES=3;
+  const _sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const getPage=async(frm,withCount)=>{
+    let lastErr;
+    for(let a=0;a<RETRIES;a++){
+      let r;
+      try{ r=await sb.from("orders").select(cols, withCount?{count:"exact"}:undefined).range(frm,frm+size-1); }
+      catch(e){ r={error:e}; }
+      if(!r.error) return r;
+      lastErr=r.error; await _sleep(400*(a+1));
     }
-    const pages=await Promise.all(reqs);
-    for(const pg of pages) all.push(...pg);
-  } else if(total==null){
+    throw lastErr;
+  };
+  const head=await getPage(0,true);
+  const total=head.count; const all=head.data.slice();
+  if(total==null){ // count unavailable — page sequentially until a short page
     let from=size;
-    for(;;){ const {data,error}=await sb.from("orders").select(cols).range(from,from+size-1); if(error) throw error; all.push(...data); if(data.length<size) break; from+=size; }
+    for(;;){ const r=await getPage(from,false); all.push(...r.data); if(r.data.length<size) break; from+=size; }
+    return all;
+  }
+  const offsets=[]; for(let frm=size; frm<total; frm+=size) offsets.push(frm);
+  for(let i=0;i<offsets.length;i+=CONC){
+    const pages=await Promise.all(offsets.slice(i,i+CONC).map(o=>getPage(o,false)));
+    for(const r of pages) all.push(...r.data);
   }
   return all;
 }
@@ -1193,7 +1205,7 @@ async function _loadFromSupabase(){
     if(!shownFromCache){
       try{ DATA=DATA0; renderAll(); stat("Couldn't load live data — showing saved snapshot","err"); }
       catch(e){ _showLogin("Couldn't load data: "+(err.message||err)); }
-    } else { stat("(couldn't refresh — showing saved copy)","err"); }
+    } else { stat("(couldn't refresh: "+((err&&err.message)?err.message:err)+" — showing saved copy)","err"); }
   }
 }
 
