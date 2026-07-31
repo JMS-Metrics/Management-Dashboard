@@ -644,7 +644,7 @@ function periodCards(P){
   return [
     std("Total Sales",money(c.sales),c.sales,p&&p.sales,P.sub),
     std("Gross Margin",money(c.marg),c.marg,p&&p.marg,mpct+"% of sales"),
-    std("New Clinics",intf(c.newc),c.newc,p&&p.newc,P.sub),
+    std("New Clinics Added",intf(c.newc),c.newc,p&&p.newc,P.sub),
     std("Active Clinics",intf(c.active),c.active,p&&p.active,P.sub),
     std("Orders",intf(c.orders),c.orders,p&&p.orders,P.sub),
     std("Avg Order Value",money(c.aov),c.aov,p&&p.aov,P.sub),
