@@ -249,6 +249,11 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
   </section>
 
   <section>
+    <div class="shead"><h2>Rep Stats</h2><span class="hint" id="rep-hint"></span></div>
+    <div class="card" style="padding:8px 10px"><table id="reptbl"></table></div>
+  </section>
+
+  <section>
     <div class="shead"><h2>Order fulfillment &amp; pharmacies</h2><span class="hint" id="ful-hint"></span></div>
     <div class="kpis" id="ful-kpis" style="margin-bottom:18px"></div>
     <div class="grid2">
@@ -261,11 +266,6 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
         <svg class="chart" id="pharmpie" viewBox="0 0 470 250" preserveAspectRatio="xMidYMid meet"></svg>
       </div>
     </div>
-  </section>
-
-  <section>
-    <div class="shead"><h2>Rep Stats</h2><span class="hint" id="rep-hint"></span></div>
-    <div class="card" style="padding:8px 10px"><table id="reptbl"></table></div>
   </section>
 
 <section>
@@ -631,15 +631,26 @@ function renderRepFilter(){
 }
 function periodCards(P){
   const c=P.cur, p=P.prv;
-  const card=(label,key,fmt,sub)=>({label,value:c[key],fmt,pct:(p&&p[key])?Math.round((c[key]/p[key]-1)*1000)/10:null,sub:sub||P.sub});
+  const totClin=(DATA.meta&&DATA.meta.total_clinics)||0;
+  const std=(label,valStr,cur,prev,sub)=>({label,val:valStr,foot:((prev)?chip(Math.round((cur/prev-1)*1000)/10):'')+'<span>'+(sub||P.sub)+'</span>'});
   const mpct=c.sales?Math.round(c.marg/c.sales*100):0;
+  // % Active = active clinics / total clinics in the (filtered) base
+  const actPct=totClin?Math.round(c.active/totClin*1000)/10:0;
+  const actPctPrev=(p&&totClin)?(p.active/totClin*100):0;
+  // Additivity = new clinics / clinics that did NOT order this period (want >= 1)
+  const inactive=Math.max(0,totClin-c.active);
+  const addit=inactive>0?(c.newc/inactive):(c.newc>0?Infinity:0);
+  const additStr=isFinite(addit)?addit.toFixed(2):'∞';
+  const additCol=addit>=1?'var(--up)':'var(--down)';
   return [
-    card("Total Sales","sales","money"),
-    card("Gross Margin","marg","money",mpct+"% of sales"),
-    card("Active Clinics","active","int"),
-    card("New Clinics","newc","int"),
-    card("Orders","orders","int"),
-    card("Avg Order Value","aov","money"),
+    std("Total Sales",money(c.sales),c.sales,p&&p.sales,P.sub),
+    std("Gross Margin",money(c.marg),c.marg,p&&p.marg,mpct+"% of sales"),
+    std("Active Clinics",intf(c.active),c.active,p&&p.active,P.sub),
+    std("New Clinics",intf(c.newc),c.newc,p&&p.newc,P.sub),
+    std("Orders",intf(c.orders),c.orders,p&&p.orders,P.sub),
+    std("Avg Order Value",money(c.aov),c.aov,p&&p.aov,P.sub),
+    {label:"% Active",val:actPct+"%",foot:((p&&actPctPrev)?chip(Math.round((actPct/actPctPrev-1)*1000)/10):'')+'<span>'+intf(c.active)+' of '+intf(totClin)+' clinics</span>'},
+    {label:"Additivity",val:'<span style="color:'+additCol+'">'+additStr+'</span>',foot:'<span>'+intf(c.newc)+' new / '+intf(inactive)+' inactive · '+(addit>=1?'growing':'shrinking')+'</span>'},
   ];
 }
 function renderKpis(){
@@ -651,8 +662,8 @@ function renderKpis(){
     host.innerHTML=periodCards(P).map((k,i)=>`
       <div class="kpi" style="animation-delay:${i*45}ms">
         <div class="lab">${k.label}</div>
-        <div class="val">${fmtv(k.value,k.fmt)}</div>
-        <div class="foot">${k.pct===null?'':chip(k.pct)}<span>${k.sub||""}</span></div>
+        <div class="val">${k.val}</div>
+        <div class="foot">${k.foot}</div>
       </div>`).join("");
   } else {
     if(hint) hint.textContent="";
@@ -733,7 +744,7 @@ function barChart(id,labels,values,o){
   o=o||{}; const el=document.getElementById(id); if(!el) return;
   const n=values.length; if(!n){ el.innerHTML=""; return; }
   const W=980,H=o.height||300,pl=64,pr=18,pt=22,pb=42,iw=W-pl-pr,ih=H-pt-pb;
-  const max=Math.max(1,Math.max.apply(null,values))*1.16;
+  const max=Math.max(1,Math.max.apply(null,values))*(o.pctChange?1.26:1.16);
   const bw=Math.max(2,(iw/n)*0.62);
   const x=i=>pl+(iw/n)*(i+0.5), y=v=>pt+ih-(v/max)*ih;
   const fmt=o.fmt||(v=>v), col=o.color||["#3D7BFF","#28509e"];
@@ -745,7 +756,10 @@ function barChart(id,labels,values,o){
   values.forEach((v,i)=>{ const bx=x(i)-bw/2, topY=y(v), h=Math.max(0,pt+ih-topY), last=i===n-1;
     g+=`<rect x="${bx.toFixed(1)}" y="${topY.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="url(#${id}_g)"/>`;
     if(last) g+=`<rect x="${bx.toFixed(1)}" y="${topY.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="none" stroke="#FF7A1A" stroke-width="1.6"/>`;
-    if(showVals&&v) g+=`<text x="${x(i)}" y="${(topY-6).toFixed(1)}" fill="${last?'#FF7A1A':'#92A2C9'}" font-size="${last?10:8.5}" text-anchor="middle"${last?' font-weight="700"':''}>${fmt(v)}</text>`;
+    if(showVals&&v){
+      if(o.pctChange && i>0 && values[i-1]){ const _pc=Math.round((v/values[i-1]-1)*100); g+=`<text x="${x(i)}" y="${(topY-17).toFixed(1)}" fill="${_pc>=0?'#37D6A0':'#FF6B6B'}" font-size="8" text-anchor="middle">${_pc>=0?'+':''}${_pc}%</text>`; }
+      g+=`<text x="${x(i)}" y="${(topY-6).toFixed(1)}" fill="${last?'#FF7A1A':'#92A2C9'}" font-size="${last?10:8.5}" text-anchor="middle"${last?' font-weight="700"':''}>${fmt(v)}</text>`;
+    }
     if(i%lblEvery===0||last) g+=`<text x="${x(i)}" y="${H-pb+18}" fill="#92A2C9" font-size="9.5" text-anchor="middle">${labels[i]}</text>`;
   });
   el.innerHTML=g;
@@ -756,7 +770,7 @@ function renderHistory(){
   const sh=document.getElementById("sh-hint"); if(sh) sh.textContent=h?("Total Sales by "+gr+span):"";
   const nh=document.getElementById("nh-hint"); if(nh) nh.textContent=h?("First-ever orders, by "+gr+span):"";
   if(!h){ const a=document.getElementById("salesHist"),b=document.getElementById("newHist"); if(a)a.innerHTML=""; if(b)b.innerHTML=""; return; }
-  barChart("salesHist",h.labels,h.sales,{fmt:money,color:["#3D7BFF","#28509e"],height:300});
+  barChart("salesHist",h.labels,h.sales,{fmt:money,color:["#3D7BFF","#28509e"],height:300,pctChange:true});
   barChart("newHist",h.labels,h.newc,{fmt:v=>String(v),color:["#2DD4BF","#16a394"],height:230});
 }
 
