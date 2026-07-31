@@ -223,7 +223,7 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
   <div class="alert" id="alert"></div>
 
   <section>
-    <div class="shead"><h2>Headline metrics</h2><span class="hint" id="kpi-hint"></span></div>
+    <div class="shead"><h2>Key Performance Indicators</h2><span class="hint" id="kpi-hint"></span></div>
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 14px">
       <div id="period-toggle" style="display:flex;gap:8px;flex-wrap:wrap"></div>
       <div id="rep-filter" style="margin-left:auto;position:relative">
@@ -634,12 +634,11 @@ function periodCards(P){
   const totClin=(DATA.meta&&DATA.meta.total_clinics)||0;
   const std=(label,valStr,cur,prev,sub)=>({label,val:valStr,foot:((prev)?chip(Math.round((cur/prev-1)*1000)/10):'')+'<span>'+(sub||P.sub)+'</span>'});
   const mpct=c.sales?Math.round(c.marg/c.sales*100):0;
-  // % Active = active clinics / total clinics in the (filtered) base
-  const actPct=totClin?Math.round(c.active/totClin*1000)/10:0;
-  const actPctPrev=(p&&totClin)?(p.active/totClin*100):0;
-  // Additivity = new clinics / clinics that did NOT order this period (want >= 1)
-  const inactive=Math.max(0,totClin-c.active);
-  const addit=inactive>0?(c.newc/inactive):(c.newc>0?Infinity:0);
+  const hasP=!!p;
+  // Clinics Lost = ordered prior period but not the current one.
+  const lost=P.lost||0;
+  // Additivity = New Clinics added / Clinics Lost (want >= 1: adding more than losing).
+  const addit=lost>0?(c.newc/lost):(c.newc>0?Infinity:0);
   const additStr=isFinite(addit)?addit.toFixed(2):'∞';
   const additCol=addit>=1?'var(--up)':'var(--down)';
   return [
@@ -649,8 +648,8 @@ function periodCards(P){
     std("New Clinics",intf(c.newc),c.newc,p&&p.newc,P.sub),
     std("Orders",intf(c.orders),c.orders,p&&p.orders,P.sub),
     std("Avg Order Value",money(c.aov),c.aov,p&&p.aov,P.sub),
-    {label:"% Active",val:actPct+"%",foot:((p&&actPctPrev)?chip(Math.round((actPct/actPctPrev-1)*1000)/10):'')+'<span>'+intf(c.active)+' of '+intf(totClin)+' clinics</span>'},
-    {label:"Additivity",val:'<span style="color:'+additCol+'">'+additStr+'</span>',foot:'<span>'+intf(c.newc)+' new / '+intf(inactive)+' inactive · '+(addit>=1?'growing':'shrinking')+'</span>'},
+    {label:"Clinics Lost",val:hasP?intf(lost):'—',foot:'<span>'+(hasP?"ordered prior period, not this one":"no prior period")+'</span>'},
+    {label:"Additivity",val:hasP?('<span style="color:'+additCol+'">'+additStr+'</span>'):'—',foot:'<span>'+(hasP?(intf(c.newc)+' new / '+intf(lost)+' lost · '+(addit>=1?'growing':'shrinking')):'needs a prior period')+'</span>'},
   ];
 }
 function renderKpis(){
@@ -1152,10 +1151,14 @@ function computeData(raw, sourceName){
     ytd:{label:"YTD", sub:"Jan 1–"+sm(cur)+" "+mDay+" · no prior-year data",
       cur:d=>d.getFullYear()===_curY, prv:null},
   };
+  // Clinics Lost = ordered in the prior period but NOT the current period.
+  const _lostFor=(curT,prvT)=>{ if(!prvT) return 0; const cur=new Set(), prv=new Set();
+    for(const r of rows){ if(r._sub>0){ if(curT(r._d)) cur.add(r._clinic); if(prvT(r._d)) prv.add(r._clinic); } }
+    let n=0; for(const cl of prv) if(!cur.has(cl)) n++; return n; };
   const periods={};
   for(const _k in _pdefs){ const _pd=_pdefs[_k];
     periods[_k]={label:_pd.label, sub:_pd.sub, cur:_agg(_pd.cur), prv:_pd.prv?_agg(_pd.prv):null,
-      fulfillment:_ffFor(_pd.cur), reps:_repsFor(_pd.cur,_pd.prv)};
+      fulfillment:_ffFor(_pd.cur), reps:_repsFor(_pd.cur,_pd.prv), lost:_lostFor(_pd.cur,_pd.prv)};
   }
 
   // ---- Sales History + New Clinics history, binned to match the period toggle ----
