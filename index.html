@@ -235,6 +235,20 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
   </section>
 
   <section>
+    <div class="shead"><h2>Sales History</h2><span class="hint" id="sh-hint"></span></div>
+    <div class="card chart-wrap">
+      <svg class="chart" id="salesHist" viewBox="0 0 980 300" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><h2>New Clinics Added</h2><span class="hint" id="nh-hint"></span></div>
+    <div class="card chart-wrap">
+      <svg class="chart" id="newHist" viewBox="0 0 980 230" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </section>
+
+  <section>
     <div class="shead"><h2>Order fulfillment &amp; pharmacies</h2><span class="hint" id="ful-hint"></span></div>
     <div class="kpis" id="ful-kpis" style="margin-bottom:18px"></div>
     <div class="grid2">
@@ -254,24 +268,7 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
     <div class="card" style="padding:8px 10px"><table id="reptbl"></table></div>
   </section>
 
-  <section>
-    <div class="shead"><h2>Week over week</h2><span class="hint" id="wow-hint"></span></div>
-    <div class="kpis" id="wow-kpis" style="margin-bottom:18px"></div>
-    <div class="card chart-wrap">
-      <svg class="chart" id="wtrend" viewBox="0 0 980 230" preserveAspectRatio="xMidYMid meet"></svg>
-      <div class="cap" id="wtrend-cap"></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="shead"><h2>Overall sales trend</h2><span class="hint">monthly revenue with 3-month moving average</span></div>
-    <div class="card chart-wrap">
-      <svg class="chart" id="trend" viewBox="0 0 980 360" preserveAspectRatio="xMidYMid meet"></svg>
-      <div class="cap" id="trend-cap"></div>
-    </div>
-  </section>
-
-  <section>
+<section>
     <div class="shead"><h2>Movers — increases &amp; decreases</h2><span class="hint" id="mov-hint"></span></div>
     <div class="grid2" style="margin-bottom:18px">
       <div class="panel up-tint"><h4><span class="dot" style="background:var(--up)"></span>Top 5 clinics gaining</h4><table id="clin-up"></table></div>
@@ -387,10 +384,11 @@ document.getElementById("foot-tot").textContent="All-time revenue "+money0(M.tot
 })();
 
 /* KPIs */
-renderPeriodToggle(); renderKpis(); renderRepFilter();
+renderPeriodToggle(); renderKpis(); renderRepFilter(); renderHistory();
 
 /* week over week */
 (function(){
+  if(!document.getElementById("wtrend")) return; // section removed
   const w=DATA.weekly; if(!w)return;
   document.getElementById("wow-hint").textContent=(w.week_partial?`current week to date (${w.days_elapsed} of 7 days) · `:`latest complete week · `)+w.cur_label+" vs "+w.prev_label;
   document.getElementById("wow-kpis").innerHTML=w.cards.map((k,i)=>`
@@ -431,6 +429,7 @@ renderPeriodToggle(); renderKpis(); renderRepFilter();
 
 /* trend chart */
 (function(){
+  if(!document.getElementById("trend")) return; // replaced by Sales History
   const s=DATA.series, W=980,H=360, pl=66,pr=18,pt=24,pb=46;
   const iw=W-pl-pr, ih=H-pt-pb;
   const max=Math.max(...s.revenue)*1.12;
@@ -670,7 +669,7 @@ function renderPeriodToggle(){
   if(!DATA.periods){ host.innerHTML=""; return; }
   const order=[["d1","1 Day"],["week","Week"],["month","Month"],["d90","90-Day"],["ytd","YTD"]].filter(o=>DATA.periods[o[0]]);
   host.innerHTML=order.map(o=>`<button class="btn pbtn" data-p="${o[0]}"${o[0]===SELP?' style="background:var(--accent);color:#0A1430;border-color:var(--accent);font-weight:700"':''}>${o[1]}</button>`).join("");
-  host.querySelectorAll(".pbtn").forEach(b=>b.addEventListener("click",()=>{ SELP=b.dataset.p; renderKpis(); renderPeriodToggle(); renderFulfillment(); renderRepStats(); }));
+  host.querySelectorAll(".pbtn").forEach(b=>b.addEventListener("click",()=>{ SELP=b.dataset.p; renderKpis(); renderPeriodToggle(); renderFulfillment(); renderRepStats(); renderHistory(); }));
 }
 function renderRepStats(){
   const host=document.getElementById("reptbl"); if(!host) return;
@@ -726,6 +725,39 @@ function renderRepStats(){
       det.style.display=open?"none":"table-row"; el.classList.toggle("open",!open);
     });
   });
+}
+
+/* ===== Sales History + New Clinics history charts (react to period toggle) ===== */
+function _grain(p){ return (p==="d1"||p==="d90")?"day":(p==="week"?"week":"month"); }
+function barChart(id,labels,values,o){
+  o=o||{}; const el=document.getElementById(id); if(!el) return;
+  const n=values.length; if(!n){ el.innerHTML=""; return; }
+  const W=980,H=o.height||300,pl=64,pr=18,pt=22,pb=42,iw=W-pl-pr,ih=H-pt-pb;
+  const max=Math.max(1,Math.max.apply(null,values))*1.16;
+  const bw=Math.max(2,(iw/n)*0.62);
+  const x=i=>pl+(iw/n)*(i+0.5), y=v=>pt+ih-(v/max)*ih;
+  const fmt=o.fmt||(v=>v), col=o.color||["#3D7BFF","#28509e"];
+  let g=`<defs><linearGradient id="${id}_g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col[0]}"/><stop offset="1" stop-color="${col[1]}"/></linearGradient></defs>`;
+  for(let i=0;i<=4;i++){ const gv=max/4*i, gy=y(gv);
+    g+=`<line x1="${pl}" y1="${gy}" x2="${W-pr}" y2="${gy}" stroke="rgba(255,255,255,.07)"/>`;
+    g+=`<text x="${pl-9}" y="${gy+4}" fill="#5d6f9c" font-size="10" text-anchor="end" font-family="IBM Plex Mono">${fmt(Math.round(gv))}</text>`; }
+  const showVals=n<=16, lblEvery=Math.max(1,Math.ceil(n/14));
+  values.forEach((v,i)=>{ const bx=x(i)-bw/2, topY=y(v), h=Math.max(0,pt+ih-topY), last=i===n-1;
+    g+=`<rect x="${bx.toFixed(1)}" y="${topY.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="url(#${id}_g)"/>`;
+    if(last) g+=`<rect x="${bx.toFixed(1)}" y="${topY.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="none" stroke="#FF7A1A" stroke-width="1.6"/>`;
+    if(showVals&&v) g+=`<text x="${x(i)}" y="${(topY-6).toFixed(1)}" fill="${last?'#FF7A1A':'#92A2C9'}" font-size="${last?10:8.5}" text-anchor="middle"${last?' font-weight="700"':''}>${fmt(v)}</text>`;
+    if(i%lblEvery===0||last) g+=`<text x="${x(i)}" y="${H-pb+18}" fill="#92A2C9" font-size="9.5" text-anchor="middle">${labels[i]}</text>`;
+  });
+  el.innerHTML=g;
+}
+function renderHistory(){
+  const h=DATA.history&&DATA.history[SELP], gr=_grain(SELP);
+  const span=SELP==="ytd"?" (this year)":SELP==="d90"?" (last 90 days)":SELP==="d1"?" (last 30 days)":SELP==="week"?" (last 12 weeks)":" (all history)";
+  const sh=document.getElementById("sh-hint"); if(sh) sh.textContent=h?("Total Sales by "+gr+span):"";
+  const nh=document.getElementById("nh-hint"); if(nh) nh.textContent=h?("First-ever orders, by "+gr+span):"";
+  if(!h){ const a=document.getElementById("salesHist"),b=document.getElementById("newHist"); if(a)a.innerHTML=""; if(b)b.innerHTML=""; return; }
+  barChart("salesHist",h.labels,h.sales,{fmt:money,color:["#3D7BFF","#28509e"],height:300});
+  barChart("newHist",h.labels,h.newc,{fmt:v=>String(v),color:["#2DD4BF","#16a394"],height:230});
 }
 
 /* ===== order fulfillment & pharmacy donuts ===== */
@@ -1112,6 +1144,24 @@ function computeData(raw, sourceName){
       fulfillment:_ffFor(_pd.cur), reps:_repsFor(_pd.cur,_pd.prv)};
   }
 
+  // ---- Sales History + New Clinics history, binned to match the period toggle ----
+  const _DAYMS=86400000;
+  const _dayOrd=d=>Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/_DAYMS);
+  const _lblDay=ord=>{const dt=new Date(ord*_DAYMS);return MONTHS[dt.getUTCMonth()]+" "+dt.getUTCDate();};
+  const _dSales=new Map(), _dNew=new Map();
+  for(const r of rows){ const o=_dayOrd(r._d); _dSales.set(o,(_dSales.get(o)||0)+r._sub); }
+  for(const fd of firstD.values()){ const o=_dayOrd(fd); _dNew.set(o,(_dNew.get(o)||0)+1); }
+  const _maxOrd=_dayOrd(maxDate);
+  const _dailyHist=nDays=>{ const labels=[],sales=[],newc=[]; for(let o=_maxOrd-nDays+1;o<=_maxOrd;o++){ labels.push(_lblDay(o)); sales.push(Math.round(_dSales.get(o)||0)); newc.push(_dNew.get(o)||0); } return {labels,sales,newc}; };
+  const _mondayOrd=o=>{ const dt=new Date(o*_DAYMS); const wd=(dt.getUTCDay()+6)%7; return o-wd; };
+  const _weeklyHist=nWk=>{ const curMon=_mondayOrd(_maxOrd); const labels=[],sales=[],newc=[];
+    for(let w=nWk-1;w>=0;w--){ const ms=curMon-w*7; let s=0,n=0; for(let k=0;k<7;k++){ s+=_dSales.get(ms+k)||0; n+=_dNew.get(ms+k)||0; }
+      const e=new Date((ms+6)*_DAYMS); labels.push(MONTHS[e.getUTCMonth()]+" "+e.getUTCDate()); sales.push(Math.round(s)); newc.push(n); }
+    return {labels,sales,newc}; };
+  const _newByMo=new Map(); for(const fd of firstD.values()){ const ym=fd.getFullYear()+"-"+String(fd.getMonth()+1).padStart(2,"0"); _newByMo.set(ym,(_newByMo.get(ym)||0)+1); }
+  const _monthlyHist=ytdOnly=>{ const ms=ytdOnly?months.filter(m=>+m.split("-")[0]===maxDate.getFullYear()):months; return {labels:ms.map(ymLabel),sales:ms.map(m=>Math.round(g(mrev,m))),newc:ms.map(m=>_newByMo.get(m)||0)}; };
+  const history={ d1:_dailyHist(30), d90:_dailyHist(90), week:_weeklyHist(12), month:_monthlyHist(false), ytd:_monthlyHist(true) };
+
   return {
     meta:{generated,current:ymLabel(cur),prior:ymLabel(prior),months:months.map(ymLabel),
       total_revenue:Math.round(tot),total_orders:new Set(rows.map(r=>r._oid)).size,
@@ -1121,7 +1171,7 @@ function computeData(raw, sourceName){
       orders:months.map(m=>g(mord,m)),margin:months.map(m=>Math.round(g(mmarg,m))),
       active_clinics:months.map(m=>g(mac,m)),ma3,sources,revenue_src:msrc},
     kpis,reps,movers:{drugs:movers(dm,5),clinics:movers(cm,5)},
-    atrisk,concentration,newbiz,rep_movers,weekly,fulfillment,periods,
+    atrisk,concentration,newbiz,rep_movers,weekly,fulfillment,periods,history,
   };
 }
 
