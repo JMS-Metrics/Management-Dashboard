@@ -635,12 +635,13 @@ function periodCards(P){
   const std=(label,valStr,cur,prev,sub)=>({label,val:valStr,foot:((prev)?chip(Math.round((cur/prev-1)*1000)/10):'')+'<span>'+(sub||P.sub)+'</span>'});
   const mpct=c.sales?Math.round(c.marg/c.sales*100):0;
   const hasP=!!p;
-  // Clinics Lost = ordered prior period but not the current one.
+  // Clinics Dropped = ordered prior period but not the current one.
   const lost=P.lost||0;
-  // Additivity = New Clinics added / Clinics Lost (want >= 1: adding more than losing).
-  const addit=lost>0?(c.newc/lost):(c.newc>0?Infinity:0);
-  const additStr=isFinite(addit)?addit.toFixed(2):'∞';
-  const additCol=addit>=1?'var(--up)':'var(--down)';
+  // Additivity = (New Clinics Added / Clinics Dropped) - 1, shown as a percentage.
+  let additStr, additCol, additDesc;
+  if(!hasP){ additStr='—'; additCol='var(--muted)'; additDesc='needs a prior period'; }
+  else if(lost===0){ if(c.newc>0){ additStr='∞'; additCol='var(--up)'; additDesc='no clinics dropped'; } else { additStr='—'; additCol='var(--muted)'; additDesc='no adds or drops'; } }
+  else { const _ap=Math.round((c.newc/lost-1)*100); additStr=(_ap>=0?'+':'')+_ap+'%'; additCol=_ap>=0?'var(--up)':'var(--down)'; additDesc=intf(c.newc)+' new / '+intf(lost)+' dropped'; }
   return [
     std("Total Sales",money(c.sales),c.sales,p&&p.sales,P.sub),
     std("Gross Margin",money(c.marg),c.marg,p&&p.marg,mpct+"% of sales"),
@@ -648,8 +649,8 @@ function periodCards(P){
     std("Active Clinics",intf(c.active),c.active,p&&p.active,P.sub),
     std("Orders",intf(c.orders),c.orders,p&&p.orders,P.sub),
     std("Avg Order Value",money(c.aov),c.aov,p&&p.aov,P.sub),
-    {label:"Clinics Lost",val:hasP?intf(lost):'—',foot:'<span>'+(hasP?"ordered prior period, not this one":"no prior period")+'</span>'},
-    {label:"Additivity",val:hasP?('<span style="color:'+additCol+'">'+additStr+'</span>'):'—',foot:'<span>'+(hasP?(intf(c.newc)+' new / '+intf(lost)+' lost · '+(addit>=1?'growing':'shrinking')):'needs a prior period')+'</span>'},
+    {label:"Clinics Dropped",val:hasP?intf(lost):'—',foot:'<span>'+(hasP?"ordered prior period, not this one":"no prior period")+'</span>'},
+    {label:"Additivity",val:'<span style="color:'+additCol+'">'+additStr+'</span>',foot:'<span>'+additDesc+'</span>'},
   ];
 }
 function renderKpis(){
