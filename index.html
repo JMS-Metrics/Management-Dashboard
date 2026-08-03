@@ -649,8 +649,8 @@ function periodCards(P){
     std("Active Clinics",intf(c.active),c.active,p&&p.active,P.sub),
     std("Orders",intf(c.orders),c.orders,p&&p.orders,P.sub),
     std("Avg Order Value",money(c.aov),c.aov,p&&p.aov,P.sub),
-    {label:"Clinics Dropped",val:hasP?intf(lost):'—',foot:'<span>'+(hasP?"ordered prior period, not this one":"no prior period")+'</span>'},
-    {label:"Additivity",val:'<span style="color:'+additCol+'">'+additStr+'</span>',foot:'<span>'+additDesc+'</span>'},
+    {label:"Ordered Prior Period",val:hasP?intf(lost):'—',foot:'<span>'+(hasP?"ordered prior period, not this one":"no prior period")+'</span>'},
+    {label:"Retention",val:'<span style="color:'+additCol+'">'+additStr+'</span>',foot:'<span>'+additDesc+'</span>'},
   ];
 }
 function renderKpis(){
