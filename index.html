@@ -75,6 +75,10 @@ section{margin-bottom:42px}
 
 /* ---- KPI grid ---- */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+#kpis{grid-template-columns:repeat(5,1fr);gap:11px}
+#kpis .kpi{padding:14px 14px}
+#kpis .kpi .val{font-size:22px}
+#kpis .kpi .lab{font-size:10.5px}
 .kpi{background:linear-gradient(180deg,var(--surface),var(--bg2));border:1px solid var(--line);
   border-radius:16px;padding:16px 17px;position:relative;overflow:hidden;
   opacity:0;transform:translateY(10px);animation:rise .55s cubic-bezier(.2,.7,.3,1) forwards}
@@ -161,9 +165,10 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
 .defs b{color:var(--muted);font-weight:600}
 
 @keyframes rise{to{opacity:1;transform:none}}
-@media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}.tiers{grid-template-columns:repeat(2,1fr)}
+@media(max-width:1100px){#kpis{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:900px){.kpis,#kpis{grid-template-columns:repeat(2,1fr)}.tiers{grid-template-columns:repeat(2,1fr)}
   .grid2,.conc{grid-template-columns:1fr}}
-@media(max-width:560px){.kpis{grid-template-columns:1fr}.tiers{grid-template-columns:1fr}}
+@media(max-width:560px){.kpis,#kpis{grid-template-columns:1fr}.tiers{grid-template-columns:1fr}}
 .rep-exp{cursor:pointer;color:var(--accent);margin-right:5px;display:inline-block;transition:transform .12s;font-size:11px}
 .rep-exp.open{transform:rotate(90deg)}
 .rep-total td{border-top:2px solid var(--line2);font-weight:700}
@@ -649,12 +654,12 @@ function periodCards(P){
   return [
     std("Total Sales",money(c.sales),c.sales,p&&p.sales,P.sub),
     std("Gross Margin",money(c.marg),c.marg,p&&p.marg,mpct+"% of sales"),
-    std("New Clinics Added",intf(c.newc),c.newc,p&&p.newc,P.sub),
     std("Active Clinics Current Period",intf(c.active),c.active,p&&p.active,P.sub),
     {label:"Active Clinics Prior Period",val:hasP?intf(p.active):'—',foot:'<span>'+(hasP?"ordered in the prior period":"no prior period")+'</span>'},
     {label:"Retention",val:'<span style="color:'+retCol+'">'+retStr+'</span>',foot:'<span>'+(hasP?"current ÷ prior active clinics":"needs a prior period")+'</span>'},
     std("Orders",intf(c.orders),c.orders,p&&p.orders,P.sub),
     std("Avg Order Value",money(c.aov),c.aov,p&&p.aov,P.sub),
+    std("New Clinics Added",intf(c.newc),c.newc,p&&p.newc,P.sub),
     {label:"Clinics Dropped",val:hasP?intf(lost):'—',foot:'<span>'+(hasP?"ordered prior period, not this one":"no prior period")+'</span>'},
     {label:"Add/Drop Ratio",val:'<span style="color:'+additCol+'">'+additStr+'</span>',foot:'<span>'+additDesc+'</span>'},
   ];
