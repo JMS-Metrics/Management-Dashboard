@@ -642,11 +642,17 @@ function periodCards(P){
   if(!hasP){ additStr='—'; additCol='var(--muted)'; additDesc='needs a prior period'; }
   else if(lost===0){ if(c.newc>0){ additStr='∞'; additCol='var(--up)'; additDesc='no clinics dropped'; } else { additStr='—'; additCol='var(--muted)'; additDesc='no adds or drops'; } }
   else { const _ap=Math.round((c.newc/lost-1)*100); additStr=(_ap>=0?'+':'')+_ap+'%'; additCol=_ap>=0?'var(--up)':'var(--down)'; additDesc=intf(c.newc)+' new / '+intf(lost)+' dropped'; }
+  // Retention = current active clinics / prior active clinics
+  let retStr='—', retCol='var(--muted)';
+  if(hasP && p.active>0){ const _r=Math.round(c.active/p.active*100); retStr=_r+'%'; retCol=_r>=100?'var(--up)':'var(--down)'; }
+  else if(hasP && c.active>0){ retStr='∞'; retCol='var(--up)'; }
   return [
     std("Total Sales",money(c.sales),c.sales,p&&p.sales,P.sub),
     std("Gross Margin",money(c.marg),c.marg,p&&p.marg,mpct+"% of sales"),
     std("New Clinics Added",intf(c.newc),c.newc,p&&p.newc,P.sub),
-    std("Active Clinics",intf(c.active),c.active,p&&p.active,P.sub),
+    std("Active Clinics Current Period",intf(c.active),c.active,p&&p.active,P.sub),
+    {label:"Active Clinics Prior Period",val:hasP?intf(p.active):'—',foot:'<span>'+(hasP?"ordered in the prior period":"no prior period")+'</span>'},
+    {label:"Retention",val:'<span style="color:'+retCol+'">'+retStr+'</span>',foot:'<span>'+(hasP?"current ÷ prior active clinics":"needs a prior period")+'</span>'},
     std("Orders",intf(c.orders),c.orders,p&&p.orders,P.sub),
     std("Avg Order Value",money(c.aov),c.aov,p&&p.aov,P.sub),
     {label:"Clinics Dropped",val:hasP?intf(lost):'—',foot:'<span>'+(hasP?"ordered prior period, not this one":"no prior period")+'</span>'},
