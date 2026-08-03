@@ -656,7 +656,7 @@ function periodCards(P){
     std("Gross Margin",money(c.marg),c.marg,p&&p.marg,mpct+"% of sales"),
     std("Active Clinics Current Period",intf(c.active),c.active,p&&p.active,P.sub),
     {label:"Active Clinics Prior Period",val:hasP?intf(p.active):'—',foot:'<span>'+(hasP?"ordered in the prior period":"no prior period")+'</span>'},
-    {label:"Active % Increase",val:'<span style="color:'+retCol+'">'+retStr+'</span>',foot:'<span>'+(hasP?"current ÷ prior active clinics":"needs a prior period")+'</span>'},
+    {label:"Active % Increase/Decrease",val:'<span style="color:'+retCol+'">'+retStr+'</span>',foot:'<span>'+(hasP?"current ÷ prior active clinics":"needs a prior period")+'</span>'},
     std("Orders",intf(c.orders),c.orders,p&&p.orders,P.sub),
     std("Avg Order Value",money(c.aov),c.aov,p&&p.aov,P.sub),
     std("New Clinics Added",intf(c.newc),c.newc,p&&p.newc,P.sub),
