@@ -88,6 +88,17 @@ section{margin-bottom:42px}
   text-transform:uppercase}
 .kpi .val{font-family:"Bricolage Grotesque";font-weight:800;font-size:27px;letter-spacing:-.02em;line-height:1}
 .kpi .foot{display:flex;align-items:center;gap:8px;margin-top:11px;font-size:12px;color:var(--faint)}
+.rmn-scroll{overflow-x:auto}
+table.rmn{border-collapse:collapse;white-space:nowrap;min-width:100%}
+table.rmn th,table.rmn td{padding:6px 10px;font-size:12.5px;text-align:right;border-bottom:1px solid var(--line)}
+table.rmn thead th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+table.rmn th.rmn-rep,table.rmn td.rmn-rep{text-align:left;position:sticky;left:0;background:var(--surface);z-index:1}
+table.rmn td.rmn-cell{cursor:pointer;color:var(--accent);font-weight:700}
+table.rmn td.rmn-cell:hover{background:var(--line)}
+table.rmn td.rmn-cell.sel{background:var(--accent);color:#fff}
+table.rmn .rmn-tot{font-weight:700;color:var(--ink)}
+table.rmn tr.rep-total td{border-top:2px solid var(--line2);font-weight:700;color:var(--ink)}
+table.rmn tr.rmn-detail td{text-align:left;background:var(--bg2);padding:10px 12px}
 .chip{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:7px;
   display:inline-flex;align-items:center;gap:3px}
 .chip.up{color:var(--up);background:rgba(55,214,160,.12)}
@@ -256,6 +267,11 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
   <section>
     <div class="shead"><h2>Rep Stats</h2><span class="hint" id="rep-hint"></span></div>
     <div class="card" style="padding:8px 10px"><table id="reptbl"></table></div>
+  </section>
+
+  <section>
+    <div class="shead"><h2>New Ordering Accounts by Rep &amp; Month</h2><span class="hint" id="rmn-hint"></span></div>
+    <div class="card" style="padding:8px 10px"><div class="rmn-scroll"><table id="rmntbl" class="rmn"></table></div></div>
   </section>
 
   <section>
@@ -482,6 +498,9 @@ renderPeriodToggle(); renderKpis(); renderRepFilter(); renderHistory();
 
 /* rep stats (period-scoped) */
 renderRepStats();
+
+/* new ordering accounts by rep & month (period-independent) */
+renderRepMonth();
 
 /* movers */
 document.getElementById("mov-hint").textContent=M.prior+" → "+M.current;
@@ -745,6 +764,50 @@ function renderRepStats(){
       const det=document.getElementById("repdet-"+el.getAttribute("data-i")); if(!det) return;
       const open=det.style.display!=="none";
       det.style.display=open?"none":"table-row"; el.classList.toggle("open",!open);
+    });
+  });
+}
+
+function renderRepMonth(){
+  const host=document.getElementById("rmntbl"); if(!host) return;
+  const R=DATA.repMonthNew; const hint=document.getElementById("rmn-hint");
+  if(!R||!R.rows||!R.rows.length){ host.innerHTML=""; if(hint) hint.textContent=""; return; }
+  if(hint) hint.textContent="First month each clinic ordered under a rep · click a number to see names";
+  const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const labels=R.monthLabels, ncols=labels.length+2;
+  let head='<thead><tr><th class="rmn-rep">Rep</th>';
+  labels.forEach(l=>head+='<th>'+esc(l)+'</th>');
+  head+='<th class="rmn-tot">Total</th></tr></thead>';
+  let body="";
+  R.rows.forEach((r,i)=>{
+    body+='<tr><td class="nm rmn-rep">'+esc(r.rep)+'</td>';
+    r.cells.forEach((c,j)=>{
+      body+= c.count>0
+        ? '<td class="rmn-cell" data-i="'+i+'" data-j="'+j+'">'+c.count+'</td>'
+        : '<td style="color:var(--faint)">·</td>';
+    });
+    body+='<td class="rmn-tot">'+r.total+'</td></tr>';
+    body+='<tr class="rmn-detail" id="rmndet-'+i+'" style="display:none"><td colspan="'+ncols+'"></td></tr>';
+  });
+  let gtot=0; body+='<tr class="rep-total"><td class="nm rmn-rep">Total</td>';
+  R.totals.forEach(t=>{ gtot+=t; body+='<td>'+(t||'·')+'</td>'; });
+  body+='<td class="rmn-tot">'+gtot+'</td></tr>';
+  host.innerHTML=head+"<tbody>"+body+"</tbody>";
+  host.querySelectorAll(".rmn-cell").forEach(function(el){
+    el.addEventListener("click",function(){
+      const i=el.getAttribute("data-i"), j=+el.getAttribute("data-j");
+      const det=document.getElementById("rmndet-"+i); if(!det) return;
+      const already=(det.style.display!=="none" && det.dataset.j===String(j));
+      host.querySelectorAll(".rmn-cell.sel").forEach(x=>x.classList.remove("sel"));
+      if(already){ det.style.display="none"; det.dataset.j=""; return; }
+      const cell=DATA.repMonthNew.rows[i].cells[j];
+      det.querySelector("td").innerHTML=
+        '<div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">'
+        +esc(DATA.repMonthNew.rows[i].rep)+' · '+esc(DATA.repMonthNew.monthLabels[j])+' · '+cell.count+' new</div>'
+        +'<div style="display:flex;flex-wrap:wrap;gap:5px 16px">'
+        +cell.names.map(n=>'<span class="nm" style="font-size:12.5px">'+esc(n)+'</span>').join("")
+        +'</div>';
+      det.style.display="table-row"; det.dataset.j=String(j); el.classList.add("sel");
     });
   });
 }
@@ -1190,6 +1253,21 @@ function computeData(raw, sourceName){
   const _newByMo=new Map(); for(const fd of firstD.values()){ const ym=fd.getFullYear()+"-"+String(fd.getMonth()+1).padStart(2,"0"); _newByMo.set(ym,(_newByMo.get(ym)||0)+1); }
   const _monthlyHist=ytdOnly=>{ const ms=ytdOnly?months.filter(m=>+m.split("-")[0]===maxDate.getFullYear()):months; return {labels:ms.map(ymLabel),sales:ms.map(m=>Math.round(g(mrev,m))),newc:ms.map(m=>_newByMo.get(m)||0)}; };
   const history={ d1:_dailyHist(30), d90:_dailyHist(90), week:_weeklyHist(12), month:_monthlyHist(false), ytd:_monthlyHist(true) };
+
+  // New ordering accounts by rep & calendar month (first month a clinic ordered under that rep)
+  const _rmFirst=new Map(); // rep clinic -> earliest {rep,cl,ym,d}
+  for(const r of rows){ if(!(r._sub>0)) continue; const rp=r._rep||"—", cl=r._clinic; if(!cl) continue;
+    const key=rp+" "+cl, ex=_rmFirst.get(key);
+    if(!ex || r._d<ex.d){ _rmFirst.set(key,{rep:rp,cl,ym:r._ym,d:r._d}); } }
+  const _rmMap=new Map(); // rep -> ym -> [clinic]
+  for(const v of _rmFirst.values()){ if(!_rmMap.has(v.rep)) _rmMap.set(v.rep,new Map());
+    const mm=_rmMap.get(v.rep); if(!mm.has(v.ym)) mm.set(v.ym,[]); mm.get(v.ym).push(v.cl); }
+  const repMonthNew={ months:months.slice(), monthLabels:months.map(ymLabel),
+    rows:[...(_rmMap.keys())].map(rp=>{ const mm=_rmMap.get(rp);
+        const cells=months.map(m=>({count:(mm.get(m)||[]).length, names:(mm.get(m)||[]).slice().sort()}));
+        return {rep:rp, cells, total:cells.reduce((a,c)=>a+c.count,0)}; })
+      .sort((a,b)=>b.total-a.total||a.rep.localeCompare(b.rep)),
+    totals:months.map(m=>{ let n=0; for(const mm of _rmMap.values()) n+=(mm.get(m)||[]).length; return n; }) };
 
   return {
     meta:{generated,current:ymLabel(cur),prior:ymLabel(prior),months:months.map(ymLabel),
