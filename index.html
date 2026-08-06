@@ -818,7 +818,8 @@ function barChart(id,labels,values,o){
   o=o||{}; const el=document.getElementById(id); if(!el) return;
   const n=values.length; if(!n){ el.innerHTML=""; return; }
   const W=980,H=o.height||300,pl=64,pr=18,pt=22,pb=42,iw=W-pl-pr,ih=H-pt-pb;
-  const max=Math.max(1,Math.max.apply(null,values))*(o.pctChange?1.26:1.16);
+  const dense=n>16;
+  const max=Math.max(1,Math.max.apply(null,values))*(o.pctChange?(dense?1.55:1.26):(dense?1.34:1.16));
   const bw=Math.max(2,(iw/n)*0.62);
   const x=i=>pl+(iw/n)*(i+0.5), y=v=>pt+ih-(v/max)*ih;
   const fmt=o.fmt||(v=>v), col=o.color||["#3D7BFF","#28509e"];
@@ -826,13 +827,20 @@ function barChart(id,labels,values,o){
   for(let i=0;i<=4;i++){ const gv=max/4*i, gy=y(gv);
     g+=`<line x1="${pl}" y1="${gy}" x2="${W-pr}" y2="${gy}" stroke="rgba(255,255,255,.07)"/>`;
     g+=`<text x="${pl-9}" y="${gy+4}" fill="#5d6f9c" font-size="10" text-anchor="end" font-family="IBM Plex Mono">${fmt(Math.round(gv))}</text>`; }
-  const showVals=n<=16, lblEvery=Math.max(1,Math.ceil(n/14));
+  const lblEvery=Math.max(1,Math.ceil(n/14));
   values.forEach((v,i)=>{ const bx=x(i)-bw/2, topY=y(v), h=Math.max(0,pt+ih-topY), last=i===n-1;
     g+=`<rect x="${bx.toFixed(1)}" y="${topY.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="url(#${id}_g)"/>`;
     if(last) g+=`<rect x="${bx.toFixed(1)}" y="${topY.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="none" stroke="#FF7A1A" stroke-width="1.6"/>`;
-    if(showVals&&v){
-      if(o.pctChange && i>0 && values[i-1]){ const _pc=Math.round((v/values[i-1]-1)*100); g+=`<text x="${x(i)}" y="${(topY-17).toFixed(1)}" fill="${_pc>=0?'#37D6A0':'#FF6B6B'}" font-size="8" text-anchor="middle">${_pc>=0?'+':''}${_pc}%</text>`; }
-      g+=`<text x="${x(i)}" y="${(topY-6).toFixed(1)}" fill="${last?'#FF7A1A':'#92A2C9'}" font-size="${last?10:8.5}" text-anchor="middle"${last?' font-weight="700"':''}>${fmt(v)}</text>`;
+    if(v){
+      if(!dense){
+        if(o.pctChange && i>0 && values[i-1]){ const _pc=Math.round((v/values[i-1]-1)*100); g+=`<text x="${x(i)}" y="${(topY-17).toFixed(1)}" fill="${_pc>=0?'#37D6A0':'#FF6B6B'}" font-size="8" text-anchor="middle">${_pc>=0?'+':''}${_pc}%</text>`; }
+        g+=`<text x="${x(i)}" y="${(topY-6).toFixed(1)}" fill="${last?'#FF7A1A':'#92A2C9'}" font-size="${last?10:8.5}" text-anchor="middle"${last?' font-weight="700"':''}>${fmt(v)}</text>`;
+      } else {
+        const dv=fmt(v), dvLen=String(dv).length*4.9, cx=x(i).toFixed(1), cy=(topY-5).toFixed(1);
+        g+=`<g transform="translate(${cx},${cy}) rotate(-90)"><text x="0" y="3" fill="${last?'#FF7A1A':'#B7C4E6'}" font-size="8" text-anchor="start"${last?' font-weight="700"':''}>${dv}</text></g>`;
+        if(o.pctChange && i>0 && values[i-1]){ const _pc=Math.round((v/values[i-1]-1)*100);
+          g+=`<g transform="translate(${cx},${cy}) rotate(-90)"><text x="${(dvLen+5).toFixed(1)}" y="3" fill="${_pc>=0?'#37D6A0':'#FF6B6B'}" font-size="8" text-anchor="start">${_pc>=0?'+':''}${_pc}%</text></g>`; }
+      }
     }
     if(i%lblEvery===0||last) g+=`<text x="${x(i)}" y="${H-pb+18}" fill="#92A2C9" font-size="9.5" text-anchor="middle">${labels[i]}</text>`;
   });
