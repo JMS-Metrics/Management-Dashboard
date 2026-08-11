@@ -275,6 +275,11 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
   </section>
 
   <section>
+    <div class="shead"><h2>Region breakdown</h2><span class="hint" id="reg-hint"></span></div>
+    <div class="card" style="padding:8px 10px"><table id="regtbl"></table></div>
+  </section>
+
+  <section>
     <div class="shead"><h2>Order fulfillment &amp; pharmacies</h2><span class="hint" id="ful-hint"></span></div>
     <div class="kpis" id="ful-kpis" style="margin-bottom:18px"></div>
     <div class="grid2">
@@ -502,6 +507,9 @@ renderRepStats();
 /* new ordering accounts by rep & month (period-independent) */
 renderRepMonth();
 
+/* region breakdown (period-scoped) */
+renderRegions();
+
 /* movers */
 document.getElementById("mov-hint").textContent=M.prior+" → "+M.current;
 function moverTbl(rows,decline){
@@ -710,7 +718,7 @@ function renderPeriodToggle(){
   if(!DATA.periods){ host.innerHTML=""; return; }
   const order=[["d1","1 Day"],["week","Week"],["month","Month"],["d90","90-Day"],["ytd","YTD"]].filter(o=>DATA.periods[o[0]]);
   host.innerHTML=order.map(o=>`<button class="btn pbtn" data-p="${o[0]}"${o[0]===SELP?' style="background:var(--accent);color:#0A1430;border-color:var(--accent);font-weight:700"':''}>${o[1]}</button>`).join("");
-  host.querySelectorAll(".pbtn").forEach(b=>b.addEventListener("click",()=>{ SELP=b.dataset.p; renderKpis(); renderPeriodToggle(); renderFulfillment(); renderRepStats(); renderHistory(); }));
+  host.querySelectorAll(".pbtn").forEach(b=>b.addEventListener("click",()=>{ SELP=b.dataset.p; renderKpis(); renderPeriodToggle(); renderFulfillment(); renderRepStats(); renderRegions(); renderHistory(); }));
 }
 function renderRepStats(){
   const host=document.getElementById("reptbl"); if(!host) return;
@@ -810,6 +818,39 @@ function renderRepMonth(){
       det.style.display="table-row"; det.dataset.j=String(j); el.classList.add("sel");
     });
   });
+}
+
+function renderRegions(){
+  const host=document.getElementById("regtbl"); if(!host) return;
+  const P=DATA.periods&&DATA.periods[SELP];
+  const regs=P?(P.regions||[]):[];
+  const hint=document.getElementById("reg-hint");
+  if(hint) hint.textContent=P?(P.label+" · sales, orders & clinics by region"):"";
+  if(!regs.length){ host.innerHTML=""; return; }
+  const hasPrior=!!(P&&P.prv);
+  const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const head=`<thead><tr><th>Region</th><th>Total Sales</th><th>Prior</th><th>Change</th><th>Orders</th><th>Active clinics</th><th>Share</th></tr></thead>`;
+  let body="";
+  regs.forEach(r=>{
+    body+=`<tr>
+      <td class="nm">${esc(r.region)}</td>
+      <td class="num">${money0(r.sales)}</td>
+      <td class="num" style="color:var(--muted)">${hasPrior?money0(r.prev):'—'}</td>
+      <td>${(r.pct===null||r.pct===undefined)?'<span class="flat-mom">—</span>':chip(r.pct)}</td>
+      <td class="num">${intf(r.orders)}</td>
+      <td class="num">${intf(r.active)}</td>
+      <td><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+          <span class="num" style="color:var(--muted)">${r.share}%</span>
+          <span class="sharebar" style="width:90px"><i style="width:${Math.min(100,r.share)}%"></i></span></div></td>
+      </tr>`;
+  });
+  const tSales=regs.reduce((a,r)=>a+(+r.sales||0),0);
+  const tPrev=hasPrior?regs.reduce((a,r)=>a+(+r.prev||0),0):null;
+  const tPct=(tPrev)?Math.round((tSales/tPrev-1)*1000)/10:null;
+  const tOrders=(P&&P.cur)?P.cur.orders:regs.reduce((a,r)=>a+(+r.orders||0),0);
+  const tActive=(P&&P.cur)?P.cur.active:regs.reduce((a,r)=>a+(+r.active||0),0);
+  body+=`<tr class="rep-total"><td class="nm">Total</td><td class="num">${money0(tSales)}</td><td class="num" style="color:var(--muted)">${tPrev===null?'—':money0(tPrev)}</td><td>${tPct===null?'<span class="flat-mom">—</span>':chip(tPct)}</td><td class="num">${intf(tOrders)}</td><td class="num">${intf(tActive)}</td><td class="num" style="color:var(--muted)">100%</td></tr>`;
+  host.innerHTML=head+"<tbody>"+body+"</tbody>";
 }
 
 /* ===== Sales History + New Clinics history charts (react to period toggle) ===== */
@@ -956,12 +997,14 @@ function computeData(raw, sourceName){
     else { const _m=String(r.order_date).match(/^(\d{4})-(\d{2})-(\d{2})/);
       d=_m ? new Date(+_m[1], +_m[2]-1, +_m[3]) : new Date(r.order_date); } // parse YYYY-MM-DD as LOCAL date (avoid UTC off-by-one)
     if(!d||isNaN(d))continue;
-    const sub=+r.subtotal||0, cost=+r.total_drug_cost||0;
+    const sub=+r.subtotal||0, cost=+(r.total_historical_drug_cost!=null&&r.total_historical_drug_cost!==""?r.total_historical_drug_cost:r.total_drug_cost)||0;
     rows.push({_d:d,_ym:ymKey(d),
       _rep:String(r.sales_rep||"").replace(/^JMS\s*-\s*/,"").trim(),
-      _sub:sub,_marg:sub-cost,_clinic:r.clinic_name,_drug:r.drug_name,_oid:r.order_id,
+      _sub:sub,_marg:sub-cost,_clinic:r.clinic_name,_drug:r.drug_name,
+      _oid:(r.pharmacy_order_id!=null&&String(r.pharmacy_order_id).trim())||r.order_id||"",
       _status:String(r.status||"").trim(),
       _pharm:(r.pharmacy_id!=null&&String(r.pharmacy_id).trim())||"(no pharmacy)",
+      _region:(r.region!=null&&String(r.region).trim())||"—",
       _src:r.Source||"—"});
   }
   if(!rows.length) throw new Error("no valid rows (check order_date column)");
@@ -1220,6 +1263,20 @@ function computeData(raw, sourceName){
       return {rep:rp,sales:s,prev:p,pct:p?Math.round((s/p-1)*1000)/10:null,active:act.get(rp)?act.get(rp).size:0,share:tot?Math.round(s/tot*1000)/10:0,newc,newcPrev,newcDelta:newc-newcPrev,newList:(nlist.get(rp)||[]).slice().sort()};
     }).sort((a,b)=>b.sales-a.sales);
   };
+  const _regionsFor=(curT,prvT)=>{
+    const cs=new Map(),ps=new Map(),act=new Map(),ords=new Map(); let tot=0;
+    for(const r of rows){ const rg=r._region||"—";
+      if(curT(r._d)){ cs.set(rg,(cs.get(rg)||0)+r._sub); tot+=r._sub;
+        if(!ords.has(rg))ords.set(rg,new Set()); ords.get(rg).add(r._oid);
+        if(r._sub>0){ if(!act.has(rg))act.set(rg,new Set()); act.get(rg).add(r._clinic);} }
+      if(prvT&&prvT(r._d)){ ps.set(rg,(ps.get(rg)||0)+r._sub); } }
+    return [...new Set([...cs.keys(),...ps.keys()])].map(rg=>{
+      const s=Math.round(cs.get(rg)||0), p=Math.round(ps.get(rg)||0);
+      return {region:rg,sales:s,prev:p,pct:p?Math.round((s/p-1)*1000)/10:null,
+        orders:ords.get(rg)?ords.get(rg).size:0,active:act.get(rg)?act.get(rg).size:0,
+        share:tot?Math.round(s/tot*1000)/10:0};
+    }).sort((a,b)=>b.sales-a.sales);
+  };
   const _pdD=new Date(maxDate.getFullYear(),maxDate.getMonth(),maxDate.getDate()-1), _pdT=_pdD.getTime();
   const _dlab=d=>MONTHS[d.getMonth()]+" "+d.getDate();
   const _pdefs={
@@ -1241,7 +1298,7 @@ function computeData(raw, sourceName){
   const periods={};
   for(const _k in _pdefs){ const _pd=_pdefs[_k];
     periods[_k]={label:_pd.label, sub:_pd.sub, cur:_agg(_pd.cur), prv:_pd.prv?_agg(_pd.prv):null,
-      fulfillment:_ffFor(_pd.cur), reps:_repsFor(_pd.cur,_pd.prv), lost:_lostFor(_pd.cur,_pd.prv)};
+      fulfillment:_ffFor(_pd.cur), reps:_repsFor(_pd.cur,_pd.prv), regions:_regionsFor(_pd.cur,_pd.prv), lost:_lostFor(_pd.cur,_pd.prv)};
   }
 
   // ---- Sales History + New Clinics history, binned to match the period toggle ----
@@ -1347,7 +1404,7 @@ async function _fetchAllOrders(){
   // Page 0 also returns the total count. Remaining pages are fetched a few at a
   // time (bounded concurrency) with retries, so a burst can't overwhelm a small
   // Supabase instance and a transient failure doesn't kill the whole refresh.
-  const cols="order_date,sales_rep,clinic_name,drug_name,subtotal,total_drug_cost,pharmacy_id,status,order_id";
+  const cols="order_date,sales_rep,clinic_name,drug_name,subtotal,total_historical_drug_cost,pharmacy_id,status,pharmacy_order_id,region";
   const size=1000, CONC=4, RETRIES=3;
   const _sleep=ms=>new Promise(r=>setTimeout(r,ms));
   const getPage=async(frm,withCount)=>{
