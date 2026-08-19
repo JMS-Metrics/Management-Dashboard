@@ -616,7 +616,12 @@ renderFulfillment();
 /* ===== headline period toggle (Week / Month / 90-Day / YTD) ===== */
 let SELP="month";
 let RAWROWS=null, ALLREPS=[], REPS=[], REPMENU=false;
-function repLabel(){ if(!REPS.length) return "All reps"; if(REPS.length===1) return REPS[0]; return REPS.length+" reps selected"; }
+// "Reps" preset = field reps only (excludes: Ashlyn, Jack, Mark, Maria, Nate, Darryl)
+// Anyone else who appears in the data (e.g. Isabella once she has orders) is included automatically.
+const REP_EXCL=/ashlyn|jack|mark|maria|nate|darryl/i;
+function _fieldReps(){ return ALLREPS.filter(function(r){ return !REP_EXCL.test(r); }); }
+function _isFieldSel(){ const f=_fieldReps(); return f.length>0 && REPS.length===f.length && f.every(function(r){ return REPS.includes(r); }); }
+function repLabel(){ if(!REPS.length) return "All"; if(_isFieldSel()) return "Reps"; if(REPS.length===1) return REPS[0]; return REPS.length+" reps selected"; }
 document.addEventListener("click",function(e){
   const w=document.getElementById("rep-filter");
   if(REPMENU && w && !w.contains(e.target)){ REPMENU=false; const m=document.getElementById("rep-menu"); if(m) m.style.display="none"; }
@@ -644,7 +649,8 @@ function renderRepFilter(){
   btn.textContent=repLabel()+" ▾";
   const row=(val,label,checked)=>'<label style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12.5px;color:var(--ink)">'
     +'<input type="checkbox" data-rep="'+esc(val)+'"'+(checked?" checked":"")+' style="accent-color:var(--accent)"><span>'+esc(label)+'</span></label>';
-  menu.innerHTML=row("__all","All reps",REPS.length===0)
+  menu.innerHTML=row("__all","All",REPS.length===0)
+    +row("__reps","Reps",_isFieldSel())
     +'<div style="height:1px;background:var(--line);margin:6px 2px"></div>'
     +ALLREPS.map(r=>row(r,r,REPS.includes(r))).join("");
   menu.style.display=REPMENU?"block":"none";
@@ -654,6 +660,7 @@ function renderRepFilter(){
     cb.addEventListener("change",function(){
       const v=cb.getAttribute("data-rep");
       if(v==="__all"){ REPS=[]; }
+      else if(v==="__reps"){ REPS=cb.checked?_fieldReps():[]; }
       else if(cb.checked){ if(REPS.indexOf(v)<0) REPS.push(v); }
       else { REPS=REPS.filter(function(x){ return x!==v; }); }
       REPMENU=true;
