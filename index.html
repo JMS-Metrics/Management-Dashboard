@@ -787,7 +787,7 @@ function renderRepMonth(){
   const host=document.getElementById("rmntbl"); if(!host) return;
   const R=DATA.repMonthNew; const hint=document.getElementById("rmn-hint");
   if(!R||!R.rows||!R.rows.length){ host.innerHTML=""; if(hint) hint.textContent=""; return; }
-  if(hint) hint.textContent="First month each clinic ordered under a rep · click a number to see names";
+  if(hint) hint.textContent="New + reactivated (first-ever order, or first after 6+ months with no orders from any rep) · click a number to see names";
   const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
   const labels=R.monthLabels, ncols=labels.length+2;
   let head='<thead><tr><th class="rmn-rep">Rep</th>';
@@ -1334,6 +1334,21 @@ function computeData(raw, sourceName){
   const _rmMap=new Map(); // rep -> ym -> [clinic]
   for(const v of _rmFirst.values()){ if(!_rmMap.has(v.rep)) _rmMap.set(v.rep,new Map());
     const mm=_rmMap.get(v.rep); if(!mm.has(v.ym)) mm.set(v.ym,[]); mm.get(v.ym).push(v.cl); }
+  // Reactivation-aware rebuild (GLOBAL gap): walk each clinic's full order timeline across
+  // ALL reps; an event = the clinic's FIRST-ever paying order, OR a paying order more than
+  // 6 months after its previous one from ANY rep. Each event is credited to the rep who
+  // placed that order, in that order's month.
+  _rmMap.clear();
+  { const _byClinic=new Map(); // clinic -> [{d,rep},...] across all reps
+    for(const r of rows){ if(!(r._sub>0)) continue; const cl=r._clinic; if(!cl) continue; const rp=r._rep||"—";
+      let arr=_byClinic.get(cl); if(!arr){ arr=[]; _byClinic.set(cl,arr); } arr.push({d:r._d,rep:rp}); }
+    const _sixMoAfter=d=>new Date(d.getFullYear(), d.getMonth()+6, d.getDate());
+    for(const [cl,arr] of _byClinic){ arr.sort((a,b)=>a.d-b.d); let prev=null;
+      for(const o of arr){ if(!prev || o.d>_sixMoAfter(prev)){
+          const ym=o.d.getFullYear()+"-"+String(o.d.getMonth()+1).padStart(2,"0");
+          let mm=_rmMap.get(o.rep); if(!mm){ mm=new Map(); _rmMap.set(o.rep,mm); }
+          if(!mm.has(ym)) mm.set(ym,[]); mm.get(ym).push(cl); }
+        prev=o.d; } } }
   const repMonthNew={ months:months.slice(), monthLabels:months.map(ymLabel),
     rows:[...(_rmMap.keys())].map(rp=>{ const mm=_rmMap.get(rp);
         const cells=months.map(m=>({count:(mm.get(m)||[]).length, names:(mm.get(m)||[]).slice().sort()}));
