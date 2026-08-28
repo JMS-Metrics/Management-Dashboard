@@ -258,9 +258,16 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
   </section>
 
   <section>
-    <div class="shead"><h2>New Clinics Added</h2><span class="hint" id="nh-hint"></span></div>
+    <div class="shead"><h2>Clinics Added vs Dropped</h2><span class="hint" id="nh-hint"></span></div>
     <div class="card chart-wrap">
-      <svg class="chart" id="newHist" viewBox="0 0 980 230" preserveAspectRatio="xMidYMid meet"></svg>
+      <svg class="chart" id="newHist" viewBox="0 0 980 250" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><h2>Active Clinics (Current Period)</h2><span class="hint" id="ah-hint"></span></div>
+    <div class="card chart-wrap">
+      <svg class="chart" id="activeHist" viewBox="0 0 980 230" preserveAspectRatio="xMidYMid meet"></svg>
     </div>
   </section>
 
@@ -894,14 +901,53 @@ function barChart(id,labels,values,o){
   });
   el.innerHTML=g;
 }
+// grouped two-series bars (paired, touching), used for Clinics Added vs Dropped
+function groupedBar(id,labels,a,b,o){
+  o=o||{}; const el=document.getElementById(id); if(!el) return;
+  const n=labels.length; if(!n){ el.innerHTML=""; return; }
+  const W=980,H=o.height||250,pl=54,pr=18,pt=34,pb=42,iw=W-pl-pr,ih=H-pt-pb;
+  const dense=n>16;
+  const maxV=Math.max(1,Math.max.apply(null,a.concat(b)));
+  const max=maxV*(dense?1.32:1.18);
+  const slot=iw/n, pairW=Math.min(slot*0.72,46), bw=pairW/2;
+  const x=i=>pl+slot*(i+0.5), y=v=>pt+ih-(v/max)*ih;
+  const ca=o.colorA||["#2DD4BF","#16a394"], cb=o.colorB||["#FF6B6B","#c0392b"];
+  const fmt=o.fmt||(v=>String(v));
+  let g=`<defs>
+    <linearGradient id="${id}_ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${ca[0]}"/><stop offset="1" stop-color="${ca[1]}"/></linearGradient>
+    <linearGradient id="${id}_gb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${cb[0]}"/><stop offset="1" stop-color="${cb[1]}"/></linearGradient></defs>`;
+  for(let k=0;k<=4;k++){ const gv=max/4*k, gy=y(gv);
+    g+=`<line x1="${pl}" y1="${gy}" x2="${W-pr}" y2="${gy}" stroke="rgba(255,255,255,.07)"/>`;
+    g+=`<text x="${pl-9}" y="${gy+4}" fill="#5d6f9c" font-size="10" text-anchor="end" font-family="IBM Plex Mono">${Math.round(gv)}</text>`; }
+  g+=`<g font-family="IBM Plex Sans,sans-serif" font-size="12">
+    <rect x="${pl}" y="9" width="12" height="12" rx="3" fill="url(#${id}_ga)"/><text x="${pl+18}" y="19" fill="#EAF0FF">${o.labelA||"Added"}</text>
+    <rect x="${pl+118}" y="9" width="12" height="12" rx="3" fill="url(#${id}_gb)"/><text x="${pl+136}" y="19" fill="#EAF0FF">${o.labelB||"Dropped"}</text></g>`;
+  const lblEvery=Math.max(1,Math.ceil(n/14));
+  for(let i=0;i<n;i++){ const cx=x(i), last=i===n-1, av=a[i]||0, bv=b[i]||0;
+    const axx=cx-bw, ay=y(av), ah=Math.max(0,pt+ih-ay), by=y(bv), bh=Math.max(0,pt+ih-by);
+    g+=`<rect x="${axx.toFixed(1)}" y="${ay.toFixed(1)}" width="${bw.toFixed(1)}" height="${ah.toFixed(1)}" rx="2" fill="url(#${id}_ga)"/>`;
+    g+=`<rect x="${cx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="2" fill="url(#${id}_gb)"/>`;
+    if(!dense){
+      if(av) g+=`<text x="${(axx+bw/2).toFixed(1)}" y="${(ay-4).toFixed(1)}" fill="#8fe6d6" font-size="8.5" text-anchor="middle">${fmt(av)}</text>`;
+      if(bv) g+=`<text x="${(cx+bw/2).toFixed(1)}" y="${(by-4).toFixed(1)}" fill="#ffb3b3" font-size="8.5" text-anchor="middle">${fmt(bv)}</text>`;
+    } else {
+      if(av) g+=`<g transform="translate(${(axx+bw/2).toFixed(1)},${(ay-4).toFixed(1)}) rotate(-90)"><text x="0" y="3" fill="#8fe6d6" font-size="8" text-anchor="start">${fmt(av)}</text></g>`;
+      if(bv) g+=`<g transform="translate(${(cx+bw/2).toFixed(1)},${(by-4).toFixed(1)}) rotate(-90)"><text x="0" y="3" fill="#ffb3b3" font-size="8" text-anchor="start">${fmt(bv)}</text></g>`;
+    }
+    if(i%lblEvery===0||last) g+=`<text x="${cx.toFixed(1)}" y="${H-pb+18}" fill="#92A2C9" font-size="9.5" text-anchor="middle">${labels[i]}</text>`;
+  }
+  el.innerHTML=g;
+}
 function renderHistory(){
   const h=DATA.history&&DATA.history[SELP], gr=_grain(SELP);
   const span=SELP==="ytd"?" (this year)":SELP==="d90"?" (last 90 days)":SELP==="d1"?" (last 30 days)":SELP==="week"?" (last 12 weeks)":" (all history)";
   const sh=document.getElementById("sh-hint"); if(sh) sh.textContent=h?("Total Sales by "+gr+span):"";
-  const nh=document.getElementById("nh-hint"); if(nh) nh.textContent=h?("First-ever orders, by "+gr+span):"";
-  if(!h){ const a=document.getElementById("salesHist"),b=document.getElementById("newHist"); if(a)a.innerHTML=""; if(b)b.innerHTML=""; return; }
+  const nh=document.getElementById("nh-hint"); if(nh) nh.textContent=h?("New (first-ever) vs dropped clinics, by "+gr+span):"";
+  const ah=document.getElementById("ah-hint"); if(ah) ah.textContent=h?("Active clinics, by "+gr+span):"";
+  if(!h){ ["salesHist","newHist","activeHist"].forEach(id=>{const el=document.getElementById(id); if(el)el.innerHTML="";}); return; }
   barChart("salesHist",h.labels,h.sales,{fmt:money,color:["#3D7BFF","#28509e"],height:300,pctChange:true});
-  barChart("newHist",h.labels,h.newc,{fmt:v=>String(v),color:["#2DD4BF","#16a394"],height:230});
+  groupedBar("newHist",h.labels,h.newc,h.dropped||[],{fmt:v=>String(v),labelA:"Clinics Added",labelB:"Clinics Dropped",height:250});
+  barChart("activeHist",h.labels,h.active||[],{fmt:v=>String(v),color:["#7C8CF8","#4759c9"],height:230});
 }
 
 /* ===== order fulfillment & pharmacy donuts ===== */
@@ -1312,18 +1358,31 @@ function computeData(raw, sourceName){
   const _DAYMS=86400000;
   const _dayOrd=d=>Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/_DAYMS);
   const _lblDay=ord=>{const dt=new Date(ord*_DAYMS);return MONTHS[dt.getUTCMonth()]+" "+dt.getUTCDate();};
-  const _dSales=new Map(), _dNew=new Map();
-  for(const r of rows){ const o=_dayOrd(r._d); _dSales.set(o,(_dSales.get(o)||0)+r._sub); }
+  const _dSales=new Map(), _dNew=new Map(), _dClin=new Map();
+  for(const r of rows){ const o=_dayOrd(r._d); _dSales.set(o,(_dSales.get(o)||0)+r._sub);
+    if(r._sub>0){ let s=_dClin.get(o); if(!s){s=new Set();_dClin.set(o,s);} s.add(r._clinic); } }
   for(const fd of firstD.values()){ const o=_dayOrd(fd); _dNew.set(o,(_dNew.get(o)||0)+1); }
   const _maxOrd=_dayOrd(maxDate);
-  const _dailyHist=nDays=>{ const labels=[],sales=[],newc=[]; for(let o=_maxOrd-nDays+1;o<=_maxOrd;o++){ labels.push(_lblDay(o)); sales.push(Math.round(_dSales.get(o)||0)); newc.push(_dNew.get(o)||0); } return {labels,sales,newc}; };
+  const _EMPTY=new Set();
+  const _diffCount=(a,b)=>{ let n=0; for(const x of a) if(!b.has(x)) n++; return n; };   // clinics in a not in b
+  const _unionDays=(from,to)=>{ const s=new Set(); for(let o=from;o<=to;o++){ const d=_dClin.get(o); if(d) for(const x of d) s.add(x); } return s; };
+  const _dailyHist=nDays=>{ const labels=[],sales=[],newc=[],active=[],dropped=[];
+    for(let o=_maxOrd-nDays+1;o<=_maxOrd;o++){ labels.push(_lblDay(o)); sales.push(Math.round(_dSales.get(o)||0)); newc.push(_dNew.get(o)||0);
+      const cur=_dClin.get(o)||_EMPTY, prev=_dClin.get(o-1)||_EMPTY; active.push(cur.size); dropped.push(_diffCount(prev,cur)); }
+    return {labels,sales,newc,active,dropped}; };
   const _mondayOrd=o=>{ const dt=new Date(o*_DAYMS); const wd=(dt.getUTCDay()+6)%7; return o-wd; };
-  const _weeklyHist=nWk=>{ const curMon=_mondayOrd(_maxOrd); const labels=[],sales=[],newc=[];
+  const _weeklyHist=nWk=>{ const curMon=_mondayOrd(_maxOrd); const labels=[],sales=[],newc=[],active=[],dropped=[];
     for(let w=nWk-1;w>=0;w--){ const ms=curMon-w*7; let s=0,n=0; for(let k=0;k<7;k++){ s+=_dSales.get(ms+k)||0; n+=_dNew.get(ms+k)||0; }
-      const e=new Date((ms+6)*_DAYMS); labels.push(MONTHS[e.getUTCMonth()]+" "+e.getUTCDate()); sales.push(Math.round(s)); newc.push(n); }
-    return {labels,sales,newc}; };
+      const e=new Date((ms+6)*_DAYMS); labels.push(MONTHS[e.getUTCMonth()]+" "+e.getUTCDate()); sales.push(Math.round(s)); newc.push(n);
+      const cur=_unionDays(ms,ms+6), prev=_unionDays(ms-7,ms-1); active.push(cur.size); dropped.push(_diffCount(prev,cur)); }
+    return {labels,sales,newc,active,dropped}; };
   const _newByMo=new Map(); for(const fd of firstD.values()){ const ym=fd.getFullYear()+"-"+String(fd.getMonth()+1).padStart(2,"0"); _newByMo.set(ym,(_newByMo.get(ym)||0)+1); }
-  const _monthlyHist=ytdOnly=>{ const ms=ytdOnly?months.filter(m=>+m.split("-")[0]===maxDate.getFullYear()):months; return {labels:ms.map(ymLabel),sales:ms.map(m=>Math.round(g(mrev,m))),newc:ms.map(m=>_newByMo.get(m)||0)}; };
+  const _moClin=new Map(); for(const r of rows){ if(r._sub>0){ let s=_moClin.get(r._ym); if(!s){s=new Set();_moClin.set(r._ym,s);} s.add(r._clinic); } }
+  const _prevYm=ym=>{ const p=ym.split("-").map(Number); const d=new Date(p[0],p[1]-2,1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); };
+  const _monthlyHist=ytdOnly=>{ const ms=ytdOnly?months.filter(m=>+m.split("-")[0]===maxDate.getFullYear()):months;
+    return {labels:ms.map(ymLabel),sales:ms.map(m=>Math.round(g(mrev,m))),newc:ms.map(m=>_newByMo.get(m)||0),
+      active:ms.map(m=>(_moClin.get(m)||_EMPTY).size),
+      dropped:ms.map(m=>_diffCount(_moClin.get(_prevYm(m))||_EMPTY,_moClin.get(m)||_EMPTY))}; };
   const history={ d1:_dailyHist(30), d90:_dailyHist(90), week:_weeklyHist(12), month:_monthlyHist(false), ytd:_monthlyHist(true) };
 
   // New ordering accounts by rep & calendar month (first month a clinic ordered under that rep)
