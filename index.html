@@ -258,9 +258,16 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
   </section>
 
   <section>
-    <div class="shead"><h2>Clinics Added vs Dropped</h2><span class="hint" id="nh-hint"></span></div>
+    <div class="shead"><h2>New Clinics Added</h2><span class="hint" id="nh-hint"></span></div>
     <div class="card chart-wrap">
-      <svg class="chart" id="newHist" viewBox="0 0 980 250" preserveAspectRatio="xMidYMid meet"></svg>
+      <svg class="chart" id="newHist" viewBox="0 0 980 230" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </section>
+
+  <section>
+    <div class="shead"><h2>Clinics Added vs Dropped (Monthly)</h2><span class="hint" id="adh-hint"></span></div>
+    <div class="card chart-wrap">
+      <svg class="chart" id="addDropHist" viewBox="0 0 980 250" preserveAspectRatio="xMidYMid meet"></svg>
     </div>
   </section>
 
@@ -942,11 +949,14 @@ function renderHistory(){
   const h=DATA.history&&DATA.history[SELP], gr=_grain(SELP);
   const span=SELP==="ytd"?" (this year)":SELP==="d90"?" (last 90 days)":SELP==="d1"?" (last 30 days)":SELP==="week"?" (last 12 weeks)":" (all history)";
   const sh=document.getElementById("sh-hint"); if(sh) sh.textContent=h?("Total Sales by "+gr+span):"";
-  const nh=document.getElementById("nh-hint"); if(nh) nh.textContent=h?("New (first-ever) vs dropped clinics, by "+gr+span):"";
+  const nh=document.getElementById("nh-hint"); if(nh) nh.textContent=h?("First-ever orders, by "+gr+span):"";
+  const adh=document.getElementById("adh-hint"); if(adh) adh.textContent="New (first-ever) added vs month-over-month dropped, by month";
   const ah=document.getElementById("ah-hint"); if(ah) ah.textContent=h?("Active clinics, by "+gr+span):"";
-  if(!h){ ["salesHist","newHist","activeHist"].forEach(id=>{const el=document.getElementById(id); if(el)el.innerHTML="";}); return; }
+  if(!h){ ["salesHist","newHist","addDropHist","activeHist"].forEach(id=>{const el=document.getElementById(id); if(el)el.innerHTML="";}); return; }
   barChart("salesHist",h.labels,h.sales,{fmt:money,color:["#3D7BFF","#28509e"],height:300,pctChange:true});
-  groupedBar("newHist",h.labels,h.newc,h.dropped||[],{fmt:v=>String(v),labelA:"Clinics Added",labelB:"Clinics Dropped",height:250});
+  barChart("newHist",h.labels,h.newc,{fmt:v=>String(v),color:["#2DD4BF","#16a394"],height:230});
+  const hm=DATA.history&&DATA.history.month;
+  if(hm) groupedBar("addDropHist",hm.labels,hm.newc,hm.dropped||[],{fmt:v=>String(v),labelA:"Clinics Added",labelB:"Clinics Dropped",height:250});
   barChart("activeHist",h.labels,h.active||[],{fmt:v=>String(v),color:["#7C8CF8","#4759c9"],height:230});
 }
 
