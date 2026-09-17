@@ -694,7 +694,7 @@ function periodCards(P){
   let additStr, additCol, additDesc;
   if(!hasP){ additStr='—'; additCol='var(--muted)'; additDesc='needs a prior period'; }
   else if(lost===0){ if(c.newc>0){ additStr='∞'; additCol='var(--up)'; additDesc='no clinics dropped'; } else { additStr='—'; additCol='var(--muted)'; additDesc='no adds or drops'; } }
-  else { const _ap=Math.round((c.newc/lost-1)*100); additStr=(_ap>=0?'+':'')+_ap+'%'; additCol=_ap>=0?'var(--up)':'var(--down)'; additDesc=intf(c.newc)+' new / '+intf(lost)+' dropped'; }
+  else { const _r=c.newc/lost; additStr=_r.toFixed(2); additCol=_r>=1?'var(--up)':'var(--down)'; additDesc=intf(c.newc)+' new / '+intf(lost)+' dropped'; }
   // Active % Increase = (current active clinics / prior active clinics) - 1
   let retStr='—', retCol='var(--muted)';
   if(hasP && p.active>0){ const _r=Math.round((c.active/p.active-1)*100); retStr=(_r>=0?'+':'')+_r+'%'; retCol=_r>=0?'var(--up)':'var(--down)'; }
