@@ -630,9 +630,10 @@ renderFulfillment();
 /* ===== headline period toggle (Week / Month / 90-Day / YTD) ===== */
 let SELP="month";
 let RAWROWS=null, ALLREPS=[], REPS=[], REPMENU=false;
-// "Reps" preset = field reps only (excludes: Ashlyn, Jack, Mark, Maria, Nate, Darryl)
-// Anyone else who appears in the data (e.g. Isabella once she has orders) is included automatically.
-const REP_EXCL=/ashlyn|jack|mark|maria|nate|darryl/i;
+// "Reps" preset = field reps only (excludes: Ashlyn, Jack, Mark, Maria, Nate)
+// Anyone else who appears in the data is included automatically. Excluded names still
+// show as their own checkbox in the dropdown — exclusion only affects the "Reps" bulk select.
+const REP_EXCL=/ashlyn|jack|mark|maria|nate/i;
 function _fieldReps(){ return ALLREPS.filter(function(r){ return !REP_EXCL.test(r); }); }
 function _isFieldSel(){ const f=_fieldReps(); return f.length>0 && REPS.length===f.length && f.every(function(r){ return REPS.includes(r); }); }
 function repLabel(){ if(!REPS.length) return "All"; if(_isFieldSel()) return "Reps"; if(REPS.length===1) return REPS[0]; return REPS.length+" reps selected"; }
