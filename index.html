@@ -1066,7 +1066,7 @@ function computeData(raw, sourceName){
       _rep:String(r.sales_rep||"").replace(/^JMS\s*-\s*/,"").trim(),
       _sub:sub,_marg:sub-cost,_clinic:r.clinic_name,_drug:r.drug_name,
       _oid:(r.pharmacy_order_id!=null&&String(r.pharmacy_order_id).trim())||r.order_id||"",
-      _status:String(r.status||"").trim(),
+      _status:String((r.prescription_status!=null&&r.prescription_status!=="")?r.prescription_status:(r.status||"")).trim(),
       _pharm:(r.pharmacy_id!=null&&String(r.pharmacy_id).trim())||"(no pharmacy)",
       _region:(r.region!=null&&String(r.region).trim())||"—",
       _src:r.Source||"—"});
@@ -1496,7 +1496,7 @@ async function _fetchAllOrders(){
   // Page 0 also returns the total count. Remaining pages are fetched a few at a
   // time (bounded concurrency) with retries, so a burst can't overwhelm a small
   // Supabase instance and a transient failure doesn't kill the whole refresh.
-  const cols="order_date,sales_rep,clinic_name,drug_name,subtotal,total_historical_drug_cost,pharmacy_id,status,pharmacy_order_id,region";
+  const cols="order_date,sales_rep,clinic_name,drug_name,subtotal,total_historical_drug_cost,pharmacy_id,status,prescription_status,pharmacy_order_id,region";
   const size=1000, CONC=4, RETRIES=3;
   const _sleep=ms=>new Promise(r=>setTimeout(r,ms));
   const getPage=async(frm,withCount)=>{
