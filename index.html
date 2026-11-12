@@ -745,17 +745,16 @@ function renderPeriodToggle(){
 function renderRepStats(){
   const host=document.getElementById("reptbl"); if(!host) return;
   const P=DATA.periods&&DATA.periods[SELP];
-  const reps=P?P.reps:((DATA.reps||[]).map(r=>({rep:r.rep,sales:r.may,prev:r.apr,pct:r.mom,active:r.active,activePrev:0,orders:0,ordersPrev:0,ordersPct:null,marg:0,share:r.share,newc:(r.newc||0),newcDelta:null,newList:[]})));
+  const reps=P?P.reps:((DATA.reps||[]).map(r=>({rep:r.rep,sales:r.may,prev:r.apr,pct:r.mom,active:r.active,activePrev:0,orders:0,ordersPrev:0,marg:0,share:r.share,newc:(r.newc||0),newcDelta:null,newList:[]})));
   const hasPrior=!!(P&&P.prv);
   const hint=document.getElementById("rep-hint");
   if(hint) hint.textContent=P?(P.label+" · Total Sales "+P.sub):"Total Sales vs prior";
-  const ncd=r=>{ if(!hasPrior||r.newcDelta===null||r.newcDelta===undefined) return '';
-    const d=r.newcDelta, c=d>0?'var(--up)':(d<0?'var(--down)':'var(--muted)');
-    return `<span style="color:${c};font-size:11px;margin-left:6px">${d>0?'+'+d:(d<0?String(d):'±0')}</span>`; };
   const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const dlt=d=>{ if(d===null||d===undefined) return ''; const c=d>0?'var(--up)':(d<0?'var(--down)':'var(--muted)');
+    return `<span style="color:${c};font-size:11px;margin-left:6px">${d>0?'+'+d:(d<0?String(d):'±0')}</span>`; };
   const chipOr=p=>(p===null||p===undefined)?'<span class="flat-mom">—</span>':chip(p);
   const apct=r=>r.activePrev?Math.round((r.active/r.activePrev-1)*1000)/10:null;
-  const head=`<thead><tr><th>Rep</th><th>Total Sales</th><th>Prior</th><th>Change</th><th># Orders</th><th>Orders Chg</th><th>Total $ Margin</th><th># New Clinics</th><th>Active clinics</th><th>Active Chg</th><th>Share</th></tr></thead>`;
+  const head=`<thead><tr><th>Rep</th><th>Total Sales</th><th>Total $ Margin</th><th>Prior</th><th>Change</th><th># Orders</th><th># New Clinics</th><th>Active clinics</th><th>Active Chg</th><th>Share</th></tr></thead>`;
   let body="";
   reps.forEach((r,i)=>{
     const has=r.newList&&r.newList.length;
@@ -763,20 +762,17 @@ function renderRepStats(){
     body+=`<tr>
       <td class="nm">${caret}${esc(r.rep)}</td>
       <td class="num">${money0(r.sales)}</td>
+      <td class="num">${money0(r.marg||0)}</td>
       <td class="num" style="color:var(--muted)">${money0(r.prev)}</td>
       <td>${chipOr(r.pct)}</td>
-      <td class="num">${intf(r.orders||0)}</td>
-      <td>${chipOr(r.ordersPct)}</td>
-      <td class="num">${money0(r.marg||0)}</td>
-      <td class="num">${r.newc||0}${ncd(r)}</td>
+      <td class="num">${intf(r.orders||0)}${hasPrior?dlt((r.orders||0)-(r.ordersPrev||0)):''}</td>
+      <td class="num">${r.newc||0}${hasPrior?dlt(r.newcDelta):''}</td>
       <td class="num">${r.active}</td>
       <td>${chipOr(apct(r))}</td>
-      <td><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
-          <span class="num" style="color:var(--muted)">${r.share}%</span>
-          <span class="sharebar" style="width:90px"><i style="width:${Math.min(100,r.share)}%"></i></span></div></td>
+      <td class="num" style="color:var(--muted)">${r.share}%</td>
       </tr>`;
     if(has){
-      body+='<tr class="rep-detail" id="repdet-'+i+'" style="display:none"><td colspan="11">'
+      body+='<tr class="rep-detail" id="repdet-'+i+'" style="display:none"><td colspan="10">'
         +'<div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">New clinics ('+r.newList.length+')'+(P?" · "+esc(P.label):"")+'</div>'
         +'<div style="display:flex;flex-wrap:wrap;gap:5px 16px">'
         +r.newList.map(n=>'<span class="nm" style="font-size:12.5px">'+esc(n)+'</span>').join("")
@@ -785,6 +781,7 @@ function renderRepStats(){
   });
   if(reps.length){
     const tSales=P?P.cur.sales:reps.reduce((a,r)=>a+(+r.sales||0),0);
+    const tMarg=P?P.cur.marg:reps.reduce((a,r)=>a+(+r.marg||0),0);
     const tPrev=(P&&P.prv)?P.prv.sales:(hasPrior?reps.reduce((a,r)=>a+(+r.prev||0),0):null);
     const tPct=(tPrev)?Math.round((tSales/tPrev-1)*1000)/10:null;
     const tNew=P?P.cur.newc:reps.reduce((a,r)=>a+(+r.newc||0),0);
@@ -792,13 +789,10 @@ function renderRepStats(){
     const tActive=P?P.cur.active:reps.reduce((a,r)=>a+(+r.active||0),0);
     const tOrders=P?P.cur.orders:reps.reduce((a,r)=>a+(+r.orders||0),0);
     const tOrdersPrev=(P&&P.prv)?P.prv.orders:null;
-    const tOrdersPct=tOrdersPrev?Math.round((tOrders/tOrdersPrev-1)*1000)/10:null;
-    const tMarg=P?P.cur.marg:reps.reduce((a,r)=>a+(+r.marg||0),0);
+    const tOrdersDelta=(tOrdersPrev===null)?null:(tOrders-tOrdersPrev);
     const tActivePrev=(P&&P.prv)?P.prv.active:null;
     const tActPct=tActivePrev?Math.round((tActive/tActivePrev-1)*1000)/10:null;
-    const dspan=d=>{ if(d===null||d===undefined) return ''; const c=d>0?'var(--up)':(d<0?'var(--down)':'var(--muted)');
-      return `<span style="color:${c};font-size:11px;margin-left:6px">${d>0?'+'+d:(d<0?String(d):'±0')}</span>`; };
-    body+=`<tr class="rep-total"><td class="nm">Total</td><td class="num">${money0(tSales)}</td><td class="num" style="color:var(--muted)">${tPrev===null?'—':money0(tPrev)}</td><td>${tPct===null?'<span class="flat-mom">—</span>':chip(tPct)}</td><td class="num">${intf(tOrders)}</td><td>${tOrdersPct===null?'<span class="flat-mom">—</span>':chip(tOrdersPct)}</td><td class="num">${money0(tMarg)}</td><td class="num">${tNew}${dspan(tNewDelta)}</td><td class="num">${tActive}</td><td>${tActPct===null?'<span class="flat-mom">—</span>':chip(tActPct)}</td><td class="num" style="color:var(--muted)">100%</td></tr>`;
+    body+=`<tr class="rep-total"><td class="nm">Total</td><td class="num">${money0(tSales)}</td><td class="num">${money0(tMarg)}</td><td class="num" style="color:var(--muted)">${tPrev===null?'—':money0(tPrev)}</td><td>${tPct===null?'<span class="flat-mom">—</span>':chip(tPct)}</td><td class="num">${intf(tOrders)}${dlt(tOrdersDelta)}</td><td class="num">${tNew}${dlt(tNewDelta)}</td><td class="num">${tActive}</td><td>${tActPct===null?'<span class="flat-mom">—</span>':chip(tActPct)}</td><td class="num" style="color:var(--muted)">100%</td></tr>`;
   }
   host.innerHTML=head+"<tbody>"+body+"</tbody>";
   host.querySelectorAll(".rep-exp").forEach(function(el){
