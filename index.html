@@ -745,17 +745,17 @@ function renderPeriodToggle(){
 function renderRepStats(){
   const host=document.getElementById("reptbl"); if(!host) return;
   const P=DATA.periods&&DATA.periods[SELP];
-  const reps=P?P.reps:((DATA.reps||[]).map(r=>({rep:r.rep,sales:r.may,prev:r.apr,pct:r.mom,active:r.active,share:r.share,newc:(r.newc||0),newcDelta:null,newList:[]})));
+  const reps=P?P.reps:((DATA.reps||[]).map(r=>({rep:r.rep,sales:r.may,prev:r.apr,pct:r.mom,active:r.active,activePrev:0,orders:0,ordersPrev:0,ordersPct:null,marg:0,share:r.share,newc:(r.newc||0),newcDelta:null,newList:[]})));
   const hasPrior=!!(P&&P.prv);
   const hint=document.getElementById("rep-hint");
   if(hint) hint.textContent=P?(P.label+" · Total Sales "+P.sub):"Total Sales vs prior";
   const ncd=r=>{ if(!hasPrior||r.newcDelta===null||r.newcDelta===undefined) return '';
     const d=r.newcDelta, c=d>0?'var(--up)':(d<0?'var(--down)':'var(--muted)');
     return `<span style="color:${c};font-size:11px;margin-left:6px">${d>0?'+'+d:(d<0?String(d):'±0')}</span>`; };
-  const head=`<thead><tr><th>Rep</th><th>Total Sales</th><th>Prior</th><th>Change</th><th># New Clinics</th><th>Active clinics</th><th>Share</th></tr></thead>`;
   const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
-  const dspan=d=>{ if(d===null||d===undefined) return ''; const c=d>0?'var(--up)':(d<0?'var(--down)':'var(--muted)');
-    return `<span style="color:${c};font-size:11px;margin-left:6px">${d>0?'+'+d:(d<0?String(d):'±0')}</span>`; };
+  const chipOr=p=>(p===null||p===undefined)?'<span class="flat-mom">—</span>':chip(p);
+  const apct=r=>r.activePrev?Math.round((r.active/r.activePrev-1)*1000)/10:null;
+  const head=`<thead><tr><th>Rep</th><th>Total Sales</th><th>Prior</th><th>Change</th><th># Orders</th><th>Orders Chg</th><th>Total $ Margin</th><th># New Clinics</th><th>Active clinics</th><th>Active Chg</th><th>Share</th></tr></thead>`;
   let body="";
   reps.forEach((r,i)=>{
     const has=r.newList&&r.newList.length;
@@ -764,15 +764,19 @@ function renderRepStats(){
       <td class="nm">${caret}${esc(r.rep)}</td>
       <td class="num">${money0(r.sales)}</td>
       <td class="num" style="color:var(--muted)">${money0(r.prev)}</td>
-      <td>${(r.pct===null||r.pct===undefined)?'<span class="flat-mom">—</span>':chip(r.pct)}</td>
+      <td>${chipOr(r.pct)}</td>
+      <td class="num">${intf(r.orders||0)}</td>
+      <td>${chipOr(r.ordersPct)}</td>
+      <td class="num">${money0(r.marg||0)}</td>
       <td class="num">${r.newc||0}${ncd(r)}</td>
       <td class="num">${r.active}</td>
+      <td>${chipOr(apct(r))}</td>
       <td><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
           <span class="num" style="color:var(--muted)">${r.share}%</span>
           <span class="sharebar" style="width:90px"><i style="width:${Math.min(100,r.share)}%"></i></span></div></td>
       </tr>`;
     if(has){
-      body+='<tr class="rep-detail" id="repdet-'+i+'" style="display:none"><td colspan="7">'
+      body+='<tr class="rep-detail" id="repdet-'+i+'" style="display:none"><td colspan="11">'
         +'<div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">New clinics ('+r.newList.length+')'+(P?" · "+esc(P.label):"")+'</div>'
         +'<div style="display:flex;flex-wrap:wrap;gap:5px 16px">'
         +r.newList.map(n=>'<span class="nm" style="font-size:12.5px">'+esc(n)+'</span>').join("")
@@ -786,7 +790,15 @@ function renderRepStats(){
     const tNew=P?P.cur.newc:reps.reduce((a,r)=>a+(+r.newc||0),0);
     const tNewDelta=(P&&P.prv)?(tNew-P.prv.newc):null;
     const tActive=P?P.cur.active:reps.reduce((a,r)=>a+(+r.active||0),0);
-    body+=`<tr class="rep-total"><td class="nm">Total</td><td class="num">${money0(tSales)}</td><td class="num" style="color:var(--muted)">${tPrev===null?'—':money0(tPrev)}</td><td>${tPct===null?'<span class="flat-mom">—</span>':chip(tPct)}</td><td class="num">${tNew}${dspan(tNewDelta)}</td><td class="num">${tActive}</td><td class="num" style="color:var(--muted)">100%</td></tr>`;
+    const tOrders=P?P.cur.orders:reps.reduce((a,r)=>a+(+r.orders||0),0);
+    const tOrdersPrev=(P&&P.prv)?P.prv.orders:null;
+    const tOrdersPct=tOrdersPrev?Math.round((tOrders/tOrdersPrev-1)*1000)/10:null;
+    const tMarg=P?P.cur.marg:reps.reduce((a,r)=>a+(+r.marg||0),0);
+    const tActivePrev=(P&&P.prv)?P.prv.active:null;
+    const tActPct=tActivePrev?Math.round((tActive/tActivePrev-1)*1000)/10:null;
+    const dspan=d=>{ if(d===null||d===undefined) return ''; const c=d>0?'var(--up)':(d<0?'var(--down)':'var(--muted)');
+      return `<span style="color:${c};font-size:11px;margin-left:6px">${d>0?'+'+d:(d<0?String(d):'±0')}</span>`; };
+    body+=`<tr class="rep-total"><td class="nm">Total</td><td class="num">${money0(tSales)}</td><td class="num" style="color:var(--muted)">${tPrev===null?'—':money0(tPrev)}</td><td>${tPct===null?'<span class="flat-mom">—</span>':chip(tPct)}</td><td class="num">${intf(tOrders)}</td><td>${tOrdersPct===null?'<span class="flat-mom">—</span>':chip(tOrdersPct)}</td><td class="num">${money0(tMarg)}</td><td class="num">${tNew}${dspan(tNewDelta)}</td><td class="num">${tActive}</td><td>${tActPct===null?'<span class="flat-mom">—</span>':chip(tActPct)}</td><td class="num" style="color:var(--muted)">100%</td></tr>`;
   }
   host.innerHTML=head+"<tbody>"+body+"</tbody>";
   host.querySelectorAll(".rep-exp").forEach(function(el){
@@ -1311,11 +1323,14 @@ function computeData(raw, sourceName){
   };
   const _ffFor=test=>computeFulfillment(_rowsAll.filter(r=>test(r._d)));
   const _repsFor=(curT,prvT)=>{
-    const cs=new Map(),ps=new Map(),act=new Map(); let tot=0;
+    const cs=new Map(),ps=new Map(),act=new Map(),actp=new Map(),mg=new Map(),ordc=new Map(),ordp=new Map(); let tot=0;
     for(const r of rows){
-      if(curT(r._d)){ cs.set(r._rep,(cs.get(r._rep)||0)+r._sub); tot+=r._sub;
+      if(curT(r._d)){ cs.set(r._rep,(cs.get(r._rep)||0)+r._sub); tot+=r._sub; mg.set(r._rep,(mg.get(r._rep)||0)+r._marg);
+        if(!ordc.has(r._rep))ordc.set(r._rep,new Set()); ordc.get(r._rep).add(r._oid);
         if(r._sub>0){ if(!act.has(r._rep))act.set(r._rep,new Set()); act.get(r._rep).add(r._clinic);} }
-      if(prvT&&prvT(r._d)){ ps.set(r._rep,(ps.get(r._rep)||0)+r._sub); }
+      if(prvT&&prvT(r._d)){ ps.set(r._rep,(ps.get(r._rep)||0)+r._sub);
+        if(!ordp.has(r._rep))ordp.set(r._rep,new Set()); ordp.get(r._rep).add(r._oid);
+        if(r._sub>0){ if(!actp.has(r._rep))actp.set(r._rep,new Set()); actp.get(r._rep).add(r._clinic);} }
     }
     const nc=new Map(),ncp=new Map(),nlist=new Map();
     for(const [cl,fd] of firstD){ const rp=firstDRep.get(cl)||"(unknown)";
@@ -1324,7 +1339,8 @@ function computeData(raw, sourceName){
     return [...new Set([...cs.keys(),...ps.keys(),...nc.keys()])].map(rp=>{
       const s=Math.round(cs.get(rp)||0), p=Math.round(ps.get(rp)||0);
       const newc=nc.get(rp)||0, newcPrev=ncp.get(rp)||0;
-      return {rep:rp,sales:s,prev:p,pct:p?Math.round((s/p-1)*1000)/10:null,active:act.get(rp)?act.get(rp).size:0,share:tot?Math.round(s/tot*1000)/10:0,newc,newcPrev,newcDelta:newc-newcPrev,newList:(nlist.get(rp)||[]).slice().sort()};
+      const _ords=ordc.get(rp)?ordc.get(rp).size:0, _ordsP=ordp.get(rp)?ordp.get(rp).size:0;
+      return {rep:rp,sales:s,prev:p,pct:p?Math.round((s/p-1)*1000)/10:null,active:act.get(rp)?act.get(rp).size:0,activePrev:actp.get(rp)?actp.get(rp).size:0,orders:_ords,ordersPrev:_ordsP,ordersPct:_ordsP?Math.round((_ords/_ordsP-1)*1000)/10:null,marg:Math.round(mg.get(rp)||0),share:tot?Math.round(s/tot*1000)/10:0,newc,newcPrev,newcDelta:newc-newcPrev,newList:(nlist.get(rp)||[]).slice().sort()};
     }).sort((a,b)=>b.sales-a.sales);
   };
   const _regionsFor=(curT,prvT)=>{
