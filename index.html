@@ -28,7 +28,7 @@ body{
   -webkit-font-smoothing:antialiased; line-height:1.45;
   font-feature-settings:"tnum" 1, "lnum" 1;
 }
-.wrap{max-width:1180px; margin:0 auto; padding:38px 26px 70px}
+.wrap{max-width:1500px; margin:0 auto; padding:34px 26px 70px}
 .mono{font-family:"IBM Plex Mono",monospace}
 .num{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums}
 
@@ -89,6 +89,8 @@ section{margin-bottom:42px}
 .kpi .val{font-family:"Bricolage Grotesque";font-weight:800;font-size:27px;letter-spacing:-.02em;line-height:1}
 .kpi .foot{display:flex;align-items:center;gap:8px;margin-top:11px;font-size:12px;color:var(--faint)}
 .rmn-scroll{overflow-x:auto}
+#reptbl th,#reptbl td{white-space:nowrap}
+#reptbl thead th{cursor:pointer;user-select:none}
 table.rmn{border-collapse:collapse;white-space:nowrap;min-width:100%}
 table.rmn th,table.rmn td{padding:6px 10px;font-size:12.5px;text-align:right;border-bottom:1px solid var(--line)}
 table.rmn thead th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
@@ -280,7 +282,7 @@ footer{border-top:1px solid var(--line);margin-top:50px;padding-top:18px;color:v
 
   <section>
     <div class="shead"><h2>Rep Stats</h2><span class="hint" id="rep-hint"></span></div>
-    <div class="card" style="padding:8px 10px"><table id="reptbl"></table></div>
+    <div class="card" style="padding:8px 10px"><div class="rmn-scroll"><table id="reptbl"></table></div></div>
   </section>
 
   <section>
@@ -742,10 +744,11 @@ function renderPeriodToggle(){
   host.innerHTML=order.map(o=>`<button class="btn pbtn" data-p="${o[0]}"${o[0]===SELP?' style="background:var(--accent);color:#0A1430;border-color:var(--accent);font-weight:700"':''}>${o[1]}</button>`).join("");
   host.querySelectorAll(".pbtn").forEach(b=>b.addEventListener("click",()=>{ SELP=b.dataset.p; renderKpis(); renderPeriodToggle(); renderFulfillment(); renderRepStats(); renderRegions(); renderHistory(); }));
 }
+let REP_SORT={key:"sales",dir:"desc"};
 function renderRepStats(){
   const host=document.getElementById("reptbl"); if(!host) return;
   const P=DATA.periods&&DATA.periods[SELP];
-  const reps=P?P.reps:((DATA.reps||[]).map(r=>({rep:r.rep,sales:r.may,prev:r.apr,pct:r.mom,active:r.active,activePrev:0,orders:0,ordersPrev:0,marg:0,share:r.share,newc:(r.newc||0),newcDelta:null,newList:[]})));
+  let reps=P?P.reps:((DATA.reps||[]).map(r=>({rep:r.rep,sales:r.may,prev:r.apr,pct:r.mom,active:r.active,activePrev:0,orders:0,ordersPrev:0,marg:0,share:r.share,newc:(r.newc||0),newcDelta:null,newList:[]})));
   const hasPrior=!!(P&&P.prv);
   const hint=document.getElementById("rep-hint");
   if(hint) hint.textContent=P?(P.label+" · Total Sales "+P.sub):"Total Sales vs prior";
@@ -753,8 +756,26 @@ function renderRepStats(){
   const dlt=d=>{ if(d===null||d===undefined) return ''; const c=d>0?'var(--up)':(d<0?'var(--down)':'var(--muted)');
     return `<span style="color:${c};font-size:11px;margin-left:6px">${d>0?'+'+d:(d<0?String(d):'±0')}</span>`; };
   const chipOr=p=>(p===null||p===undefined)?'<span class="flat-mom">—</span>':chip(p);
-  const apct=r=>r.activePrev?Math.round((r.active/r.activePrev-1)*1000)/10:null;
-  const head=`<thead><tr><th>Rep</th><th>Total Sales</th><th>Total $ Margin</th><th>Prior</th><th>Change</th><th># Orders</th><th># New Clinics</th><th>Active clinics</th><th>Active Chg</th><th>Share</th></tr></thead>`;
+  reps=reps.map(function(r){ return Object.assign({},r,{_apct:r.activePrev?Math.round((r.active/r.activePrev-1)*1000)/10:null, _oDelta:hasPrior?((r.orders||0)-(r.ordersPrev||0)):null}); });
+  const COLS=[
+    {k:"rep",label:"Rep",t:"text",left:true},
+    {k:"sales",label:"Total Sales",t:"num"},
+    {k:"marg",label:"Total $ Margin",t:"num"},
+    {k:"prev",label:"Prior",t:"num"},
+    {k:"pct",label:"Change",t:"num"},
+    {k:"orders",label:"# Orders",t:"num"},
+    {k:"newc",label:"# New Clinics",t:"num"},
+    {k:"active",label:"Active clinics",t:"num"},
+    {k:"_apct",label:"Active Chg",t:"num"},
+    {k:"share",label:"Share",t:"num"}
+  ];
+  const col=COLS.find(c=>c.k===REP_SORT.key)||COLS[1], dir=REP_SORT.dir;
+  reps=reps.slice().sort(function(a,b){ let va=a[REP_SORT.key],vb=b[REP_SORT.key];
+    const an=(va===null||va===undefined),bn=(vb===null||vb===undefined);
+    if(an&&bn)return 0; if(an)return 1; if(bn)return -1;
+    let r=col.t==="text"?String(va).localeCompare(String(vb)):(+va)-(+vb);
+    return dir==="asc"?r:-r; });
+  let head='<thead><tr>'+COLS.map(function(c){ const arrow=REP_SORT.key===c.k?(REP_SORT.dir==="asc"?" ▲":" ▼"):""; const st=c.left?' style="text-align:left"':''; return '<th class="rep-sort" data-k="'+c.k+'"'+st+'>'+c.label+arrow+'</th>'; }).join("")+'</tr></thead>';
   let body="";
   reps.forEach((r,i)=>{
     const has=r.newList&&r.newList.length;
@@ -765,10 +786,10 @@ function renderRepStats(){
       <td class="num">${money0(r.marg||0)}</td>
       <td class="num" style="color:var(--muted)">${money0(r.prev)}</td>
       <td>${chipOr(r.pct)}</td>
-      <td class="num">${intf(r.orders||0)}${hasPrior?dlt((r.orders||0)-(r.ordersPrev||0)):''}</td>
+      <td class="num">${intf(r.orders||0)}${dlt(r._oDelta)}</td>
       <td class="num">${r.newc||0}${hasPrior?dlt(r.newcDelta):''}</td>
       <td class="num">${r.active}</td>
-      <td>${chipOr(apct(r))}</td>
+      <td>${chipOr(r._apct)}</td>
       <td class="num" style="color:var(--muted)">${r.share}%</td>
       </tr>`;
     if(has){
@@ -795,6 +816,14 @@ function renderRepStats(){
     body+=`<tr class="rep-total"><td class="nm">Total</td><td class="num">${money0(tSales)}</td><td class="num">${money0(tMarg)}</td><td class="num" style="color:var(--muted)">${tPrev===null?'—':money0(tPrev)}</td><td>${tPct===null?'<span class="flat-mom">—</span>':chip(tPct)}</td><td class="num">${intf(tOrders)}${dlt(tOrdersDelta)}</td><td class="num">${tNew}${dlt(tNewDelta)}</td><td class="num">${tActive}</td><td>${tActPct===null?'<span class="flat-mom">—</span>':chip(tActPct)}</td><td class="num" style="color:var(--muted)">100%</td></tr>`;
   }
   host.innerHTML=head+"<tbody>"+body+"</tbody>";
+  host.querySelectorAll(".rep-sort").forEach(function(th){
+    th.addEventListener("click",function(){
+      const k=th.getAttribute("data-k"), c=COLS.find(x=>x.k===k);
+      if(REP_SORT.key===k){ REP_SORT.dir=REP_SORT.dir==="asc"?"desc":"asc"; }
+      else { REP_SORT.key=k; REP_SORT.dir=(c&&c.t==="num")?"desc":"asc"; }
+      renderRepStats();
+    });
+  });
   host.querySelectorAll(".rep-exp").forEach(function(el){
     el.addEventListener("click",function(){
       const det=document.getElementById("repdet-"+el.getAttribute("data-i")); if(!det) return;
