@@ -1096,7 +1096,7 @@ function computeData(raw, sourceName){
     else { const _m=String(r.order_date).match(/^(\d{4})-(\d{2})-(\d{2})/);
       d=_m ? new Date(+_m[1], +_m[2]-1, +_m[3]) : new Date(r.order_date); } // parse YYYY-MM-DD as LOCAL date (avoid UTC off-by-one)
     if(!d||isNaN(d))continue;
-    const sub=+r.subtotal||0, cost=+(r.total_historical_drug_cost!=null&&r.total_historical_drug_cost!==""?r.total_historical_drug_cost:r.total_drug_cost)||0;
+    const sub=parseFloat(String(r.subtotal||"").replace(/[^0-9.-]/g,""))||0, cost=parseFloat(String((r.total_historical_drug_cost!=null&&r.total_historical_drug_cost!==""?r.total_historical_drug_cost:r.total_drug_cost)||"").replace(/[^0-9.-]/g,""))||0;
     rows.push({_d:d,_ym:ymKey(d),
       _rep:String(r.sales_rep||"").replace(/^JMS\s*-\s*/,"").trim(),
       _sub:sub,_marg:sub-cost,_clinic:r.clinic_name,_drug:r.drug_name,
@@ -1568,7 +1568,7 @@ async function _loadFromSupabase(){
   let uid="anon";
   try{ const {data:{session}}=await sb.auth.getSession(); if(session&&session.user) uid=session.user.id; }catch(e){}
   const key="mgmt:"+_CACHE_VER+":"+uid;
-  const sigOf=rows=>rows.length+":"+Math.round(rows.reduce((a,r)=>a+(+r.subtotal||0),0));
+  const sigOf=rows=>rows.length+":"+Math.round(rows.reduce((a,r)=>a+(parseFloat(String(r.subtotal||"").replace(/[^0-9.-]/g,""))||0),0));
   const stat=(t,c)=>{ const s=document.getElementById("imp-status"); if(s){ s.textContent=t; s.className="imp-status"+(c?(" "+c):""); } };
 
   // 1) Instant paint from cache, if present.
