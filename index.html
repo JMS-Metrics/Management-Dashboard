@@ -691,12 +691,11 @@ function periodCards(P){
   const std=(label,valStr,cur,prev,sub)=>({label,val:valStr,foot:((prev)?chip(Math.round((cur/prev-1)*1000)/10):'')+'<span>'+(sub||P.sub)+'</span>'});
   const mpct=c.sales?Math.round(c.marg/c.sales*100):0;
   const hasP=!!p;
-  // Clinics Dropped = ordered prior period but not the current one.
-  const lost=P.lost||0;
+  // Clinics Dropped = clinics with no paying order in the last 45 days (period-independent).
+  const lost=(DATA.meta&&DATA.meta.dropped45)||0;
   // Additivity = (New Clinics Added / Clinics Dropped) - 1, shown as a percentage.
   let additStr, additCol, additDesc;
-  if(!hasP){ additStr='—'; additCol='var(--muted)'; additDesc='needs a prior period'; }
-  else if(lost===0){ if(c.newc>0){ additStr='∞'; additCol='var(--up)'; additDesc='no clinics dropped'; } else { additStr='—'; additCol='var(--muted)'; additDesc='no adds or drops'; } }
+  if(lost===0){ if(c.newc>0){ additStr='∞'; additCol='var(--up)'; additDesc='no clinics dropped'; } else { additStr='—'; additCol='var(--muted)'; additDesc='no adds or drops'; } }
   else { const _r=c.newc/lost; additStr=_r.toFixed(2); additCol=_r>=1?'var(--up)':'var(--down)'; additDesc=intf(c.newc)+' new / '+intf(lost)+' dropped'; }
   // Active % Increase = (current active clinics / prior active clinics) - 1
   let retStr='—', retCol='var(--muted)';
@@ -711,7 +710,7 @@ function periodCards(P){
     std("Orders",intf(c.orders),c.orders,p&&p.orders,P.sub),
     std("Avg Order Value",money(c.aov),c.aov,p&&p.aov,P.sub),
     std("New Clinics Added",intf(c.newc),c.newc,p&&p.newc,P.sub),
-    {label:"Clinics Dropped",val:hasP?intf(lost):'—',foot:'<span>'+(hasP?"ordered prior period, not this one":"no prior period")+'</span>'},
+    {label:"Clinics Dropped",val:intf(lost),foot:'<span>no order in 45+ days</span>'},
     {label:"Add/Drop Ratio",val:'<span style="color:'+additCol+'">'+additStr+'</span>',foot:'<span>'+additDesc+'</span>'},
   ];
 }
@@ -1158,6 +1157,11 @@ function computeData(raw, sourceName){
 
   // ---- partial current-month detection + fair same-day-span prior ----
   const maxDate=rows.reduce((mx,r)=>r._d>mx?r._d:mx,rows[0]._d);
+  const _lastOrd=new Map();
+  for(const r of rows){ if(r._sub>0){ const _pv=_lastOrd.get(r._clinic); if(!_pv||r._d>_pv) _lastOrd.set(r._clinic,r._d); } }
+  const _midTs=dt=>new Date(dt.getFullYear(),dt.getMonth(),dt.getDate()).getTime();
+  const _maxMid=_midTs(maxDate);
+  let dropped45=0; for(const _d of _lastOrd.values()){ if((_maxMid-_midTs(_d))/86400000 > 45) dropped45++; }
   const mDay=maxDate.getDate();
   const dim=new Date(maxDate.getFullYear(),maxDate.getMonth()+1,0).getDate();
   const monthPartial=mDay<dim;
@@ -1468,7 +1472,7 @@ function computeData(raw, sourceName){
   return {
     meta:{generated,current:ymLabel(cur),prior:ymLabel(prior),months:months.map(ymLabel),
       total_revenue:Math.round(tot),total_orders:new Set(rows.map(r=>r._oid)).size,
-      total_clinics:cm.size,total_drugs:dm.size,reps:rm.size,
+      total_clinics:cm.size,dropped45,total_drugs:dm.size,reps:rm.size,
       partial:monthPartial,day:mDay,days_in_month:dim,maxdate:`${sm(cur)} ${mDay}`},
     series:{months:months.map(ymLabel),revenue:revvals.map(Math.round),
       orders:months.map(m=>g(mord,m)),margin:months.map(m=>Math.round(g(mmarg,m))),
