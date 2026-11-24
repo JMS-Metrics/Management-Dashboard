@@ -766,7 +766,6 @@ function renderRepStats(){
     {k:"orders",label:"# Orders",t:"num"},
     {k:"newc",label:"# New Clinics",t:"num"},
     {k:"active",label:"Active clinics",t:"num"},
-    {k:"_apct",label:"Active Chg",t:"num"},
     {k:"nclin",label:"Total Accounts",t:"num"},
     {k:"_pctActive",label:"% Active",t:"num"},
     {k:"share",label:"Share",t:"num"}
@@ -790,14 +789,13 @@ function renderRepStats(){
       <td>${chipOr(r.pct)}</td>
       <td class="num">${intf(r.orders||0)}${dlt(r._oDelta)}</td>
       <td class="num">${r.newc||0}${hasPrior?dlt(r.newcDelta):''}</td>
-      <td class="num">${r.active}</td>
-      <td>${chipOr(r._apct)}</td>
+      <td class="num">${r.active}${hasPrior?dlt(r.active-(r.activePrev||0)):''}</td>
       <td class="num">${intf(r.nclin||0)}</td>
       <td class="num">${r._pctActive===null?'—':r._pctActive+'%'}</td>
       <td class="num" style="color:var(--muted)">${r.share}%</td>
       </tr>`;
     if(has){
-      body+='<tr class="rep-detail" id="repdet-'+i+'" style="display:none"><td colspan="12">'
+      body+='<tr class="rep-detail" id="repdet-'+i+'" style="display:none"><td colspan="11">'
         +'<div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">New clinics ('+r.newList.length+')'+(P?" · "+esc(P.label):"")+'</div>'
         +'<div style="display:flex;flex-wrap:wrap;gap:5px 16px">'
         +r.newList.map(n=>'<span class="nm" style="font-size:12.5px">'+esc(n)+'</span>').join("")
@@ -819,7 +817,7 @@ function renderRepStats(){
     const tActPct=tActivePrev?Math.round((tActive/tActivePrev-1)*1000)/10:null;
     const tClin=(DATA.meta&&DATA.meta.total_clinics)||0;
     const tPctActive=tClin?Math.round((tActive/tClin)*1000)/10:null;
-    body+=`<tr class="rep-total"><td class="nm">Total</td><td class="num">${money0(tSales)}</td><td class="num">${money0(tMarg)}</td><td class="num" style="color:var(--muted)">${tPrev===null?'—':money0(tPrev)}</td><td>${tPct===null?'<span class="flat-mom">—</span>':chip(tPct)}</td><td class="num">${intf(tOrders)}${dlt(tOrdersDelta)}</td><td class="num">${tNew}${dlt(tNewDelta)}</td><td class="num">${tActive}</td><td>${tActPct===null?'<span class="flat-mom">—</span>':chip(tActPct)}</td><td class="num">${intf(tClin)}</td><td class="num">${tPctActive===null?'—':tPctActive+'%'}</td><td class="num" style="color:var(--muted)">100%</td></tr>`;
+    body+=`<tr class="rep-total"><td class="nm">Total</td><td class="num">${money0(tSales)}</td><td class="num">${money0(tMarg)}</td><td class="num" style="color:var(--muted)">${tPrev===null?'—':money0(tPrev)}</td><td>${tPct===null?'<span class="flat-mom">—</span>':chip(tPct)}</td><td class="num">${intf(tOrders)}${dlt(tOrdersDelta)}</td><td class="num">${tNew}${dlt(tNewDelta)}</td><td class="num">${tActive}${dlt(tActivePrev===null?null:(tActive-tActivePrev))}</td><td class="num">${intf(tClin)}</td><td class="num">${tPctActive===null?'—':tPctActive+'%'}</td><td class="num" style="color:var(--muted)">100%</td></tr>`;
   }
   host.innerHTML=head+"<tbody>"+body+"</tbody>";
   host.querySelectorAll(".rep-sort").forEach(function(th){
