@@ -994,10 +994,10 @@ function renderHistory(){
   const ah=document.getElementById("ah-hint"); if(ah) ah.textContent=h?("Active clinics, by "+gr+span):"";
   if(!h){ ["salesHist","newHist","addDropHist","activeHist"].forEach(id=>{const el=document.getElementById(id); if(el)el.innerHTML="";}); return; }
   barChart("salesHist",h.labels,h.sales,{fmt:money,color:["#3D7BFF","#28509e"],height:300,pctChange:true});
-  barChart("newHist",h.labels,h.newc,{fmt:v=>String(v),color:["#2DD4BF","#16a394"],height:230});
+  barChart("newHist",h.labels,h.newc,{fmt:v=>String(v),color:["#2DD4BF","#16a394"],height:230,pctChange:true});
   const hm=DATA.history&&DATA.history.month;
   if(hm) groupedBar("addDropHist",hm.labels,hm.newc,hm.dropped||[],{fmt:v=>String(v),labelA:"Clinics Added",labelB:"Clinics Dropped",height:250});
-  barChart("activeHist",h.labels,h.active||[],{fmt:v=>String(v),color:["#7C8CF8","#4759c9"],height:230});
+  barChart("activeHist",h.labels,h.active||[],{fmt:v=>String(v),color:["#7C8CF8","#4759c9"],height:230,pctChange:true});
 }
 
 /* ===== order fulfillment & pharmacy donuts ===== */
